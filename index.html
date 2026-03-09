@@ -80,12 +80,17 @@
   /* Grid areas */
   .g-price { grid-column: 1 / 3; grid-row: 1; }
   .g-eia { grid-column: 3; grid-row: 1; }
-  .g-hormuz { grid-column: 4; grid-row: 1 / 3; overflow-y: auto; }
+  .g-hormuz { grid-column: 4; grid-row: 1; overflow-y: auto; }
   .g-hormuz::-webkit-scrollbar { width: 3px; }
   .g-hormuz::-webkit-scrollbar-thumb { background: var(--dim); }
-  .g-spr { grid-column: 1; grid-row: 2; }
-  .g-prod { grid-column: 2; grid-row: 2; }
-  .g-spread { grid-column: 3; grid-row: 2; }
+  .g-map { grid-column: 1 / 3; grid-row: 2; position: relative; }
+  .g-map iframe { width: 100%; height: 100%; border: none; display: block; filter: saturate(0.5) brightness(0.65); position: absolute; top: 0; left: 0; }
+  .g-news { grid-column: 3; grid-row: 2; overflow-y: auto; }
+  .g-news::-webkit-scrollbar { width: 3px; }
+  .g-news::-webkit-scrollbar-thumb { background: var(--dim); }
+  .g-mini { grid-column: 4; grid-row: 2; display: flex; flex-direction: column; gap: 1px; }
+  .mini-chart { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .mini-chart canvas { flex: 1; min-height: 0; }
 
   /* EIA BARS */
   .eia-summary { display: flex; gap: 3px; margin-bottom: 4px; flex-shrink: 0; }
@@ -110,9 +115,12 @@
   .hormuz-stat .hs-label { color: var(--muted); }
   .hormuz-stat .hs-value { font-weight: 600; color: var(--text); }
 
-  /* MAP */
-  .map-wrap { flex: 1; min-height: 0; position: relative; margin-top: 4px; }
-  .map-wrap iframe { width: 100%; height: 100%; border: none; display: block; filter: saturate(0.5) brightness(0.65); position: absolute; top: 0; left: 0; }
+  /* NEWS */
+  .news-item { padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .news-item:last-child { border-bottom: none; }
+  .news-item a { font-family: var(--mono); font-size: 9px; color: var(--accent); text-decoration: none; line-height: 1.3; display: block; }
+  .news-item a:hover { text-decoration: underline; }
+  .news-item .news-src { font-size: 7px; color: var(--muted); margin-top: 1px; }
 
   /* QUICK LINKS */
   .quick-links { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
@@ -247,51 +255,57 @@
     </div>
   </div>
 
-  <!-- Hormuz + Map (col 4, row 1-2) -->
+  <!-- Hormuz Stats (col 4, row 1) -->
   <div class="panel g-hormuz">
-    <div class="panel-title">Strait of Hormuz — Risk Monitor</div>
+    <div class="panel-title">Strait of Hormuz — Risk</div>
     <div class="hormuz-stat"><span class="hs-label">Daily Transit</span><span class="hs-value" id="hz-transit">~20.5 mb/d</span></div>
     <div class="hormuz-stat"><span class="hs-label">Global Oil</span><span class="hs-value">~21%</span></div>
     <div class="hormuz-stat"><span class="hs-label">Global LNG</span><span class="hs-value">~25%</span></div>
     <div class="hormuz-stat"><span class="hs-label">Producers</span><span class="hs-value">SA, IR, IQ, UAE, KW, QA</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Bypass</span><span class="hs-value">~6.5 mb/d</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Risk</span><span class="hs-value" id="hz-risk" style="color:var(--accent)">MODERATE</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Iran (est)</span><span class="hs-value" id="hz-iran">~1.5 mb/d</span></div>
-    <div class="map-wrap">
-      <iframe
-        src="https://www.marinetraffic.com/en/ais/embed/maptype:0/zoom:9/centerx:56.25/centery:26.56/shownames:false/mmsi:0/shipid:0/fleet:/fleet_id:0/type:1/lang:en"
-        title="MarineTraffic Hormuz"
-        loading="lazy"
-      ></iframe>
-    </div>
-    <div class="quick-links">
+    <div class="hormuz-stat"><span class="hs-label">Bypass Cap.</span><span class="hs-value">~6.5 mb/d (pipelines)</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Disruption Risk</span><span class="hs-value" id="hz-risk" style="color:var(--accent)">MODERATE</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Iran Exports</span><span class="hs-value" id="hz-iran">~1.5 mb/d</span></div>
+    <div style="font-family:var(--mono);font-size:7px;color:var(--dim);margin-top:4px">⚠ AIS data requires paid sub. Values from EIA/IEA reports.</div>
+    <div class="quick-links" style="margin-top:auto">
       <a href="https://www.reuters.com/business/energy/" target="_blank">Reuters</a>
       <a href="https://www.ft.com/oil-gas" target="_blank">FT</a>
-      <a href="https://news.google.com/search?q=strait+of+hormuz+oil" target="_blank">Hormuz News</a>
       <a href="https://oilprice.com/" target="_blank">OilPrice</a>
-      <a href="https://www.eia.gov/petroleum/supply/weekly/" target="_blank">EIA Weekly</a>
       <a href="https://www.marinetraffic.com/en/ais/home/centerx:56.3/centery:26.5/zoom:7" target="_blank">AIS Full</a>
     </div>
   </div>
 
-  <!-- SPR (col 1, row 2) -->
-  <div class="panel chart-panel g-spr">
-    <div class="panel-title">Strategic Petroleum Reserve</div>
-    <canvas id="sprChart"></canvas>
-    <div id="spr-info" style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:2px;flex-shrink:0"></div>
+  <!-- MarineTraffic Map (col 1-2, row 2 — BIG) -->
+  <div class="panel g-map">
+    <iframe
+      src="https://www.marinetraffic.com/en/ais/embed/maptype:0/zoom:9/centerx:56.25/centery:26.56/shownames:false/mmsi:0/shipid:0/fleet:/fleet_id:0/type:1/lang:en"
+      title="MarineTraffic Hormuz"
+      loading="lazy"
+    ></iframe>
   </div>
 
-  <!-- US Production (col 2, row 2) -->
-  <div class="panel chart-panel g-prod">
-    <div class="panel-title">US Crude Production (mb/d)</div>
-    <canvas id="prodChart"></canvas>
-    <div id="prod-info" style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:2px;flex-shrink:0"></div>
+  <!-- News Feed (col 3, row 2) -->
+  <div class="panel g-news">
+    <div class="panel-title">Energy News — Live RSS</div>
+    <div id="news-content" style="flex:1;overflow-y:auto;min-height:0">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading news...</div>
+    </div>
+    <div class="quick-links" style="margin-top:4px;flex-shrink:0">
+      <a href="https://www.eia.gov/todayinenergy/" target="_blank">EIA Today</a>
+      <a href="https://news.google.com/search?q=strait+of+hormuz+oil" target="_blank">Hormuz</a>
+      <a href="https://www.eia.gov/petroleum/supply/weekly/" target="_blank">EIA Weekly</a>
+    </div>
   </div>
 
-  <!-- Spread Chart (col 3, row 2) -->
-  <div class="panel chart-panel g-spread">
-    <div class="panel-title">Brent–WTI Spread (1Y)</div>
-    <canvas id="spreadChart"></canvas>
+  <!-- Mini Charts: SPR + Production stacked (col 4, row 2) -->
+  <div class="panel g-mini">
+    <div class="mini-chart" style="background:var(--panel);padding:4px 6px">
+      <div class="panel-title">SPR <span id="spr-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span></div>
+      <canvas id="sprChart"></canvas>
+    </div>
+    <div class="mini-chart" style="background:var(--panel);padding:4px 6px">
+      <div class="panel-title">US Production <span id="prod-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span></div>
+      <canvas id="prodChart"></canvas>
+    </div>
   </div>
 
 </div>
@@ -674,26 +688,42 @@ async function loadProduction() {
 }
 
 // ==========================================
-// SPREAD CHART
+// NEWS FEED
 // ==========================================
-async function loadSpreadChart() {
-  const startDate = new Date(); startDate.setFullYear(startDate.getFullYear() - 1);
-  const start = startDate.toISOString().split('T')[0];
-  const [fredBrent, fredWti] = await Promise.all([fetchFred('DCOILBRENTEU', start), fetchFred('DCOILWTICO', start)]);
-  if (!fredBrent || !fredWti) return;
-  const spread = fredWti.map(w => { const b = fredBrent.find(bp => bp.date === w.date); return b ? { date: w.date, value: b.value - w.value } : null; }).filter(Boolean);
-  if (!spread.length) return;
-
-  if (charts.spread) charts.spread.destroy();
-  charts.spread = new Chart(document.getElementById('spreadChart').getContext('2d'), {
-    type: 'line',
-    data: { datasets: [{ label: 'Brent-WTI ($)', data: spread.map(d => ({ x: d.date, y: d.value })), borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.08)', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.2, segment: { borderColor: ctx => (ctx.p0.parsed.y >= 0 ? '#20c060' : '#e03030') } }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + ctx.parsed.y.toFixed(2) } } },
-      scales: { x: { type: 'time', time: { unit: 'month' }, grid: { display: false } }, y: { grid: { color: 'rgba(30,37,48,0.8)' }, ticks: { callback: v => '$' + v } } }
-    }
-  });
+async function loadNews() {
+  const feeds = [
+    { url: 'https://oilprice.com/rss/main', name: 'OilPrice' },
+    { url: 'https://www.eia.gov/rss/todayinenergy.xml', name: 'EIA' },
+    { url: 'https://news.google.com/rss/search?q=oil+crude+hormuz&hl=en-US&gl=US&ceid=US:en', name: 'Google' },
+  ];
+  let allItems = [];
+  for (const feed of feeds) {
+    try {
+      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=8`;
+      const r = await fetch(apiUrl);
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (data.items) {
+        allItems.push(...data.items.map(it => ({
+          title: it.title,
+          link: it.link,
+          src: feed.name,
+          date: new Date(it.pubDate),
+        })));
+      }
+    } catch(e) { continue; }
+  }
+  allItems.sort((a, b) => b.date - a.date);
+  const el = document.getElementById('news-content');
+  if (allItems.length === 0) {
+    el.innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--muted)">RSS feeds unavailable. Use links below.</div>`;
+    apiStatus.rss = 'err';
+    return;
+  }
+  apiStatus.rss = 'ok';
+  el.innerHTML = allItems.slice(0, 15).map(it =>
+    `<div class="news-item"><a href="${it.link}" target="_blank">${it.title}</a><div class="news-src">${it.src} · ${it.date.toLocaleDateString('en-GB', {day:'numeric',month:'short'})}</div></div>`
+  ).join('');
 }
 
 // ==========================================
@@ -763,8 +793,8 @@ async function refreshAll() {
   await Promise.allSettled([
     loadSPR(),
     loadProduction(),
-    loadPriceChart(),
-    loadSpreadChart().then(() => { apiStatus.fred = 'ok'; }).catch(() => { apiStatus.fred = 'err'; }),
+    loadPriceChart().then(() => { apiStatus.fred = 'ok'; }).catch(() => { apiStatus.fred = 'err'; }),
+    loadNews(),
   ]);
   calculateOSI();
   updateApiStatus();
