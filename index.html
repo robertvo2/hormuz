@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HORMUZ // OVERSUPPLY MONITOR</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-date-fns/3.0.0/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c0f; --panel: #0f1318; --border: #1e2530; --accent: #e8a020;
+    --red: #e03030; --green: #20c060; --blue: #2080e0; --dim: #3a4555;
+    --text: #dde8f0; --muted: #6a7f95;
+    --mono: 'JetBrains Mono', monospace; --sans: 'Barlow Condensed', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); display: flex; flex-direction: column; min-height: 100vh; }
+  body::before { content: ''; position: fixed; top:0;left:0;right:0;bottom:0; background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px); pointer-events: none; z-index: 1000; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex-shrink: 0; }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1.2s infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(32,192,96,0.4); } 50% { opacity:0.6; box-shadow: 0 0 0 5px rgba(32,192,96,0); } }
+  .status-dot.error { background: var(--red); animation-name: pulse-red; }
+  @keyframes pulse-red { 0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(224,48,48,0.4); } 50% { opacity:0.6; box-shadow: 0 0 0 5px rgba(224,48,48,0); } }
+  h1 { font-family: var(--sans); font-weight: 900; font-size: 17px; letter-spacing: 4px; color: #fff; text-transform: uppercase; }
+  h1 span { color: var(--accent); }
+  .header-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: right; line-height: 1.5; }
+
+  .ticker-wrap { background: #080a0d; border-bottom: 1px solid var(--border); overflow: hidden; height: 24px; display: flex; align-items: center; flex-shrink: 0; }
+  .ticker-label { background: var(--accent); color: #000; font-family: var(--mono); font-size: 9px; font-weight: bold; padding: 0 8px; height: 100%; display: flex; align-items: center; flex-shrink: 0; letter-spacing: 1px; }
+  .ticker-inner { overflow: hidden; flex: 1; }
+  .ticker-scroll { display: flex; animation: scroll 50s linear infinite; white-space: nowrap; padding-left: 16px; }
+  @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  .ticker-item { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--text); margin-right: 32px; }
+  .ticker-item .sym { color: var(--accent); margin-right: 5px; }
+  .up { color: #20c060; } .dn { color: #e03030; }
+
+  /* MAIN LAYOUT — scrollable */
+  .main { flex: 1; overflow-y: auto; padding: 1px; }
+  .main::-webkit-scrollbar { width: 4px; }
+  .main::-webkit-scrollbar-thumb { background: var(--dim); }
+
+  /* GRID ROWS */
+  .price-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--border); }
+  .price-tile { background: var(--panel); padding: 8px 12px; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; }
+  .price-tile::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); opacity: 0.3; }
+  .tile-label { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 2px; color: #8aa0b8; margin-bottom: 2px; text-transform: uppercase; }
+  .tile-price { font-family: var(--mono); font-size: 26px; color: #fff; line-height: 1; letter-spacing: -1px; }
+  .tile-price.red-val { color: var(--red); }
+  .tile-change { font-family: var(--mono); font-size: 10px; font-weight: 600; margin-top: 3px; }
+  .tile-sub { font-family: var(--mono); font-size: 9px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+
+  /* OVERSUPPLY METER */
+  .oversupply-row { background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 10px 16px; }
+  .oversupply-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .oversupply-header .label { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 2px; color: #8aa0b8; text-transform: uppercase; }
+  .oversupply-header .reading { font-family: var(--mono); font-size: 24px; font-weight: 700; }
+  .oversupply-header .sublabel { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .meter-track { height: 20px; background: linear-gradient(to right, var(--red) 0%, var(--accent) 50%, var(--green) 100%); border-radius: 3px; position: relative; overflow: visible; }
+  .meter-marker { position: absolute; top: -4px; width: 3px; height: 28px; background: #fff; border-radius: 2px; transition: left 0.8s ease; box-shadow: 0 0 6px rgba(255,255,255,0.6); }
+  .meter-labels { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 8px; color: var(--muted); margin-top: 4px; }
+
+  /* CHART GRID */
+  .chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1px; background: var(--border); }
+  .chart-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); }
+  .bottom-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 1px; background: var(--border); }
+
+  .panel { background: var(--panel); padding: 10px 14px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+  .panel-title { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 2px; color: #8aa0b8; text-transform: uppercase; margin-bottom: 8px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+  .panel-title::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  .chart-panel { height: 260px; }
+  .chart-panel canvas { width: 100% !important; max-height: 220px; }
+
+  /* EIA BARS */
+  .eia-summary { display: flex; gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
+  .eia-stat { flex: 1; background: var(--bg); border: 1px solid var(--border); padding: 5px 7px; }
+  .eia-stat-label { font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: 1px; color: #8aa0b8; text-transform: uppercase; margin-bottom: 2px; }
+  .eia-stat-val { font-family: var(--mono); font-size: 20px; color: #fff; line-height: 1; }
+  .eia-stat-sub { font-family: var(--mono); font-size: 9px; margin-top: 2px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .bar-label { font-family: var(--mono); font-size: 9px; font-weight: 600; color: var(--muted); width: 68px; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 16px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; transition: width 1s ease; }
+  .bar-fill.low { background: linear-gradient(90deg, #6b0f0f, var(--red)); }
+  .bar-fill.med { background: linear-gradient(90deg, #6a3200, #e07020); }
+  .bar-fill.ok { background: linear-gradient(90deg, #6a4a00, var(--accent)); }
+  .bar-fill.high { background: linear-gradient(90deg, #0a4a20, var(--green)); }
+  .bar-avg-line { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.3); pointer-events: none; }
+  .bar-val { font-family: var(--mono); font-size: 9px; font-weight: 600; color: var(--text); width: 105px; flex-shrink: 0; text-align: right; line-height: 1.4; }
+
+  /* NEWS / RSS */
+  .news-panel { overflow-y: auto; max-height: 400px; }
+  .news-panel::-webkit-scrollbar { width: 3px; }
+  .news-panel::-webkit-scrollbar-thumb { background: var(--dim); }
+  .news-item { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .news-item:last-child { border-bottom: none; }
+  .news-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+  .news-text { font-family: var(--sans); font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text); flex: 1; }
+  .news-text a { color: var(--text); text-decoration: none; }
+  .news-text a:hover { color: var(--accent); }
+  .news-meta { font-family: var(--mono); font-size: 8px; color: var(--muted); margin-top: 2px; }
+
+  /* LINKS */
+  .links-panel { overflow: hidden; min-height: 0; }
+  .links-scroll { overflow-y: auto; flex: 1; min-height: 0; }
+  .links-scroll::-webkit-scrollbar { width: 3px; }
+  .links-scroll::-webkit-scrollbar-thumb { background: var(--dim); }
+  .note-input-row { display: flex; gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
+  .note-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--dim); color: var(--text); font-family: var(--mono); font-size: 10px; padding: 4px 8px; outline: none; }
+  .note-input-row button { background: none; border: 1px solid var(--dim); color: var(--accent); font-family: var(--mono); font-size: 9px; padding: 4px 8px; cursor: pointer; }
+  .link-item { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); align-items: center; }
+  .link-src { font-family: var(--mono); font-size: 8px; background: var(--border); color: var(--accent); padding: 2px 5px; flex-shrink: 0; letter-spacing: 1px; }
+  .link-text { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text); }
+  .link-text a { color: var(--text); text-decoration: none; }
+  .link-text a:hover { color: var(--accent); }
+  .note-item { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); background: rgba(232,160,32,0.05); border-left: 2px solid var(--accent); padding-left: 6px; margin-bottom: 3px; }
+  .note-time { font-family: var(--mono); font-size: 8px; color: var(--muted); flex-shrink: 0; margin-top: 2px; }
+  .note-del { cursor: pointer; color: var(--muted); font-size: 10px; flex-shrink: 0; margin-top: 1px; }
+  .note-del:hover { color: var(--red); }
+
+  /* MAP */
+  .map-panel { padding: 0; overflow: hidden; }
+  .map-header { padding: 6px 14px; background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .map-panel iframe { width: 100%; border: none; display: block; filter: saturate(0.5) brightness(0.65); height: 300px; }
+
+  /* HORMUZ STATS */
+  .hormuz-stat { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 11px; }
+  .hormuz-stat:last-child { border-bottom: none; }
+  .hormuz-stat .hs-label { color: var(--muted); }
+  .hormuz-stat .hs-value { font-weight: 600; color: var(--text); }
+
+  footer { padding: 4px 16px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; background: var(--panel); }
+  footer span { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .refresh-btn { background: none; border: 1px solid var(--dim); color: var(--muted); font-family: var(--mono); font-size: 9px; padding: 3px 10px; cursor: pointer; letter-spacing: 1px; transition: all 0.2s; }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .error-badge { font-family: var(--mono); font-size: 9px; color: var(--red); background: rgba(224,48,48,0.1); border: 1px solid rgba(224,48,48,0.2); padding: 2px 6px; border-radius: 3px; }
+  .ok-badge { font-family: var(--mono); font-size: 9px; color: var(--green); background: rgba(32,192,96,0.1); border: 1px solid rgba(32,192,96,0.2); padding: 2px 6px; border-radius: 3px; }
+
+  @media (max-width: 1000px) {
+    .price-row { grid-template-columns: repeat(3, 1fr); }
+    .chart-grid, .chart-grid-3, .bottom-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="status-dot" id="statusDot"></div>
+    <h1>HORMUZ <span>//</span> OVERSUPPLY MONITOR</h1>
+  </div>
+  <div class="header-meta">
+    <div id="clock">--:-- UTC</div>
+    <div>Updated: <span id="last-updated">--</span></div>
+    <div id="api-status" style="margin-top:2px"></div>
+  </div>
+</header>
+
+<div class="ticker-wrap">
+  <div class="ticker-label">LIVE</div>
+  <div class="ticker-inner">
+    <div class="ticker-scroll">
+      <span class="ticker-item"><span class="sym">BRENT</span><span id="t-brent">...</span></span>
+      <span class="ticker-item"><span class="sym">WTI</span><span id="t-wti">...</span></span>
+      <span class="ticker-item"><span class="sym">VIX</span><span id="t-vix">...</span></span>
+      <span class="ticker-item"><span class="sym">EUR/USD</span><span id="t-eur">...</span></span>
+      <span class="ticker-item"><span class="sym">GOLD</span><span id="t-gold">...</span></span>
+      <span class="ticker-item"><span class="sym">NAT GAS</span><span id="t-ng">...</span></span>
+      <span class="ticker-item"><span class="sym">S&amp;P 500</span><span id="t-sp">...</span></span>
+      <span class="ticker-item"><span class="sym">SPREAD</span><span id="t-spread">...</span></span>
+      <!-- duplicate for scroll -->
+      <span class="ticker-item"><span class="sym">BRENT</span><span id="t-brent2">...</span></span>
+      <span class="ticker-item"><span class="sym">WTI</span><span id="t-wti2">...</span></span>
+      <span class="ticker-item"><span class="sym">VIX</span><span id="t-vix2">...</span></span>
+      <span class="ticker-item"><span class="sym">EUR/USD</span><span id="t-eur2">...</span></span>
+      <span class="ticker-item"><span class="sym">GOLD</span><span id="t-gold2">...</span></span>
+      <span class="ticker-item"><span class="sym">NAT GAS</span><span id="t-ng2">...</span></span>
+      <span class="ticker-item"><span class="sym">S&amp;P 500</span><span id="t-sp2">...</span></span>
+      <span class="ticker-item"><span class="sym">SPREAD</span><span id="t-spread2">...</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- PRICE TILES -->
+  <div class="price-row">
+    <div class="price-tile">
+      <div class="tile-label">Brent Crude</div>
+      <div class="tile-price" id="brent-price">--.-</div>
+      <div class="tile-change" id="brent-chg">USD/bbl</div>
+    </div>
+    <div class="price-tile">
+      <div class="tile-label">WTI Crude</div>
+      <div class="tile-price" id="wti-price">--.-</div>
+      <div class="tile-change" id="wti-chg">USD/bbl</div>
+    </div>
+    <div class="price-tile">
+      <div class="tile-label">Brent–WTI Spread</div>
+      <div class="tile-price" id="spread-price">--.-</div>
+      <div class="tile-change" id="spread-chg">Contango proxy</div>
+    </div>
+    <div class="price-tile">
+      <div class="tile-label">VIX</div>
+      <div class="tile-price red-val" id="vix-price">--.-</div>
+      <div class="tile-change" id="vix-chg">loading...</div>
+    </div>
+    <div class="price-tile">
+      <div class="tile-label">EUR / USD</div>
+      <div class="tile-price" id="eur-price">--.-</div>
+      <div class="tile-change" id="eur-chg">loading...</div>
+      <div class="tile-sub" id="conversion-val">€17k = $--</div>
+    </div>
+    <div class="price-tile">
+      <div class="tile-label">Gold</div>
+      <div class="tile-price" id="gold-price">--.-</div>
+      <div class="tile-change" id="gold-chg">USD/oz</div>
+    </div>
+  </div>
+
+  <!-- OVERSUPPLY METER -->
+  <div class="oversupply-row">
+    <div class="oversupply-header">
+      <div>
+        <div class="label">Oversupply Confidence Index</div>
+        <div class="sublabel">Composite: Inventory level + trend, price, spread, production</div>
+      </div>
+      <div style="text-align:right">
+        <div class="reading" id="osi-value" style="color:var(--accent)">—</div>
+        <div class="sublabel" id="osi-label">Calculating...</div>
+      </div>
+    </div>
+    <div class="meter-track">
+      <div class="meter-marker" id="osi-marker" style="left:50%"></div>
+    </div>
+    <div class="meter-labels">
+      <span>◀ TIGHT SUPPLY</span>
+      <span>BALANCED</span>
+      <span>OVERSUPPLIED ▶</span>
+    </div>
+  </div>
+
+  <!-- ROW 1: Price chart + EIA inventory -->
+  <div class="chart-grid">
+    <div class="panel chart-panel">
+      <div class="panel-title">Brent &amp; WTI — Recent <span id="chart-range-label"></span></div>
+      <canvas id="priceChart"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">EIA US Commercial Crude Stocks — Weekly</div>
+      <div id="eia-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Loading EIA...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: SPR + Production + Spread chart -->
+  <div class="chart-grid-3">
+    <div class="panel chart-panel">
+      <div class="panel-title">Strategic Petroleum Reserve</div>
+      <canvas id="sprChart"></canvas>
+      <div id="spr-info" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px"></div>
+    </div>
+    <div class="panel chart-panel">
+      <div class="panel-title">US Crude Production (mb/d)</div>
+      <canvas id="prodChart"></canvas>
+      <div id="prod-info" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px"></div>
+    </div>
+    <div class="panel chart-panel">
+      <div class="panel-title">Brent–WTI Spread (1Y)</div>
+      <canvas id="spreadChart"></canvas>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:4px">
+        Positive = Brent premium. Widening can signal regional tightness.
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: News RSS + Hormuz risk -->
+  <div class="chart-grid">
+    <div class="panel news-panel">
+      <div class="panel-title">Energy News Feed — Live RSS</div>
+      <div id="news-content">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Loading feeds...</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Strait of Hormuz — Risk Monitor</div>
+      <div class="hormuz-stat"><span class="hs-label">Est. Daily Transit</span><span class="hs-value" id="hz-transit">~20.5 mb/d</span></div>
+      <div class="hormuz-stat"><span class="hs-label">Global Oil Share</span><span class="hs-value">~21%</span></div>
+      <div class="hormuz-stat"><span class="hs-label">Global LNG Share</span><span class="hs-value">~25%</span></div>
+      <div class="hormuz-stat"><span class="hs-label">Key Producers</span><span class="hs-value">SA, IR, IQ, UAE, KW, QA</span></div>
+      <div class="hormuz-stat"><span class="hs-label">Bypass Capacity</span><span class="hs-value">~6.5 mb/d (pipelines)</span></div>
+      <div class="hormuz-stat"><span class="hs-label">Disruption Risk</span><span class="hs-value" id="hz-risk" style="color:var(--accent)">MODERATE</span></div>
+      <div class="hormuz-stat"><span class="hs-label">Iran Exports (est)</span><span class="hs-value" id="hz-iran">~1.5 mb/d</span></div>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--dim);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+        ⚠ Real-time AIS data requires paid sub (MarineTraffic/VesselFinder). Values from EIA/IEA reports.
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Links + Map -->
+  <div class="bottom-grid">
+    <div class="panel links-panel">
+      <div class="panel-title">Sources &amp; Field Notes</div>
+      <div class="note-input-row">
+        <input id="note-input" type="text" placeholder="Add note... (Enter)" onkeydown="if(event.key==='Enter') addNote()" />
+        <button onclick="addNote()">+ADD</button>
+      </div>
+      <div class="links-scroll" id="links-content"></div>
+    </div>
+    <div class="panel map-panel">
+      <div class="map-header">
+        <div class="panel-title" style="margin-bottom:0">MarineTraffic — Strait of Hormuz</div>
+      </div>
+      <iframe
+        src="https://www.marinetraffic.com/en/ais/embed/maptype:0/zoom:9/centerx:56.25/centery:26.56/shownames:false/mmsi:0/shipid:0/fleet:/fleet_id:0/type:1/lang:en"
+        title="MarineTraffic Hormuz"
+        loading="lazy"
+        style="height:300px"
+      ></iframe>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>Data: Yahoo Finance · EIA.gov · FRED · RSS feeds · MarineTraffic — Auto-refresh: 5 min</span>
+  <div>
+    <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
+  </div>
+</footer>
+
+<script>
+// ==========================================
+// CLOCK
+// ==========================================
+function updateClock() { document.getElementById('clock').textContent = new Date().toUTCString().slice(17,22) + ' UTC'; }
+setInterval(updateClock, 1000); updateClock();
+function setLastUpdated() { document.getElementById('last-updated').textContent = new Date().toUTCString().slice(5,22); }
+
+// ==========================================
+// CHART.JS DEFAULTS
+// ==========================================
+Chart.defaults.color = '#6a7f95';
+Chart.defaults.borderColor = '#1e2530';
+Chart.defaults.font.family = 'JetBrains Mono, monospace';
+Chart.defaults.font.size = 10;
+let charts = {};
+
+// ==========================================
+// DATA FETCH HELPERS
+// ==========================================
+// Primary: direct Yahoo Finance (works when hosted)
+// Fallback: allorigins proxy (for local file:// testing)
+async function fetchYahoo(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`;
+
+  // Try direct first (works when hosted on a website)
+  try {
+    const r = await fetch(url);
+    if (r.ok) {
+      const data = await r.json();
+      return parseYahooResponse(data);
+    }
+  } catch(e) {}
+
+  // Fallback: allorigins proxy
+  try {
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const r = await fetch(proxy);
+    const j = await r.json();
+    return parseYahooResponse(JSON.parse(j.contents));
+  } catch(e) {}
+
+  // Fallback 2: corsproxy.io
+  try {
+    const proxy2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    const r = await fetch(proxy2);
+    const data = await r.json();
+    return parseYahooResponse(data);
+  } catch(e) {}
+
+  return null;
+}
+
+function parseYahooResponse(data) {
+  const meta = data.chart.result[0].meta;
+  const price = meta.regularMarketPrice;
+  const prev = meta.chartPreviousClose || meta.previousClose;
+  const change = price - prev;
+  const pct = change / prev * 100;
+  return { price, change, pct, prev };
+}
+
+// Yahoo historical (for charts)
+async function fetchYahooHistory(symbol, range, interval) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
+
+  for (const fetcher of [
+    () => fetch(url),
+    () => fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`).then(r => r.json()).then(j => ({ ok: true, json: () => Promise.resolve(JSON.parse(j.contents)) })),
+    () => fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`),
+  ]) {
+    try {
+      const r = await fetcher();
+      if (!r.ok) continue;
+      const data = await r.json();
+      const result = data.chart.result[0];
+      const ts = result.timestamp;
+      const quotes = result.indicators.quote[0];
+      return ts.map((t, i) => ({
+        date: new Date(t * 1000).toISOString().split('T')[0],
+        close: quotes.close[i],
+        open: quotes.open?.[i],
+        high: quotes.high?.[i],
+        low: quotes.low?.[i],
+      })).filter(d => d.close !== null);
+    } catch(e) { continue; }
+  }
+  return null;
+}
+
+// EIA API (direct, CORS-friendly)
+const EIA_KEY = 'f6NK52MeWn2cnNTVQjS8faDQK0im65vjNObcrglx';
+async function fetchEia(route, params = {}) {
+  const qp = new URLSearchParams({ api_key: EIA_KEY, ...params });
+  const url = `https://api.eia.gov/v2/${route}?${qp}`;
+
+  // EIA API supports CORS natively
+  try {
+    const r = await fetch(url);
+    if (r.ok) return await r.json();
+  } catch(e) {}
+
+  // Fallback proxy
+  try {
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const r = await fetch(proxy);
+    const j = await r.json();
+    return JSON.parse(j.contents);
+  } catch(e) {}
+  return null;
+}
+
+// FRED API
+const FRED_KEY = 'b77ecd40c7e0bf40a82c05bb68faedc0'; // free public demo key, replace with yours
+async function fetchFred(seriesId, startDate) {
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_KEY}&file_type=json&observation_start=${startDate}&sort_order=asc`;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.observations?.filter(o => o.value !== '.').map(o => ({ date: o.date, value: parseFloat(o.value) }));
+  } catch(e) { return null; }
+}
+
+// ==========================================
+// PRICE LOADING
+// ==========================================
+let latestPrices = {};
+
+async function loadPrices() {
+  const symbols = [
+    { sym: 'BZ=F', id: 'brent', label: 'Brent' },
+    { sym: 'CL=F', id: 'wti', label: 'WTI' },
+    { sym: '^VIX', id: 'vix', label: 'VIX' },
+    { sym: 'GC=F', id: 'gold', label: 'Gold' },
+    { sym: 'NG=F', id: 'ng', label: 'NatGas' },
+    { sym: '^GSPC', id: 'sp', label: 'S&P' },
+    { sym: 'EURUSD=X', id: 'eur', label: 'EUR/USD' },
+  ];
+
+  for (const s of symbols) {
+    const d = await fetchYahoo(s.sym);
+    if (!d) continue;
+    latestPrices[s.id] = d;
+    await new Promise(r => setTimeout(r, 300)); // rate limit
+  }
+
+  updatePriceTiles();
+}
+
+function fmtChg(change, pct) {
+  const s = change >= 0 ? '+' : '';
+  return `${s}${change.toFixed(2)} (${s}${pct.toFixed(1)}%)`;
+}
+
+function updatePriceTiles() {
+  const b = latestPrices.brent;
+  const w = latestPrices.wti;
+
+  if (b) {
+    document.getElementById('brent-price').textContent = b.price.toFixed(2);
+    const el = document.getElementById('brent-chg');
+    el.textContent = fmtChg(b.change, b.pct);
+    el.className = 'tile-change ' + (b.change >= 0 ? 'up' : 'dn');
+    ['t-brent','t-brent2'].forEach(id => {
+      const e = document.getElementById(id);
+      e.textContent = (b.change>=0?'▲':'▼') + ' $' + b.price.toFixed(2);
+      e.className = b.change >= 0 ? 'up' : 'dn';
+    });
+  }
+
+  if (w) {
+    document.getElementById('wti-price').textContent = w.price.toFixed(2);
+    const el = document.getElementById('wti-chg');
+    el.textContent = fmtChg(w.change, w.pct);
+    el.className = 'tile-change ' + (w.change >= 0 ? 'up' : 'dn');
+    ['t-wti','t-wti2'].forEach(id => {
+      const e = document.getElementById(id);
+      e.textContent = (w.change>=0?'▲':'▼') + ' $' + w.price.toFixed(2);
+      e.className = w.change >= 0 ? 'up' : 'dn';
+    });
+  }
+
+  // Spread
+  if (b && w) {
+    const spread = b.price - w.price;
+    const prevSpread = b.prev - w.prev;
+    const spreadChg = spread - prevSpread;
+    document.getElementById('spread-price').textContent = '$' + spread.toFixed(2);
+    const spEl = document.getElementById('spread-chg');
+    spEl.textContent = (spreadChg>=0?'+':'') + spreadChg.toFixed(2) + ' vs prev';
+    spEl.className = 'tile-change ' + (spreadChg >= 0 ? 'up' : 'dn');
+    ['t-spread','t-spread2'].forEach(id => document.getElementById(id).textContent = '$' + spread.toFixed(2));
+  }
+
+  // VIX
+  const v = latestPrices.vix;
+  if (v) {
+    document.getElementById('vix-price').textContent = v.price.toFixed(2);
+    document.getElementById('vix-price').className = 'tile-price' + (v.price > 25 ? ' red-val' : '');
+    const vel = document.getElementById('vix-chg');
+    vel.textContent = fmtChg(v.change, v.pct);
+    vel.className = 'tile-change ' + (v.change >= 0 ? 'dn' : 'up'); // VIX inverted logic
+    ['t-vix','t-vix2'].forEach(id => document.getElementById(id).textContent = v.price.toFixed(2));
+  }
+
+  // EUR/USD
+  const e = latestPrices.eur;
+  if (e) {
+    document.getElementById('eur-price').textContent = e.price.toFixed(4);
+    const eel = document.getElementById('eur-chg');
+    eel.textContent = fmtChg(e.change, e.pct);
+    eel.className = 'tile-change ' + (e.change >= 0 ? 'up' : 'dn');
+    const usdEur = 1 / e.price;
+    document.getElementById('conversion-val').textContent = '€17k = $' + (17000 / usdEur).toFixed(0);
+    ['t-eur','t-eur2'].forEach(id => document.getElementById(id).textContent = e.price.toFixed(4));
+  }
+
+  // Gold
+  const g = latestPrices.gold;
+  if (g) {
+    document.getElementById('gold-price').textContent = g.price.toFixed(0);
+    const gel = document.getElementById('gold-chg');
+    gel.textContent = fmtChg(g.change, g.pct);
+    gel.className = 'tile-change ' + (g.change >= 0 ? 'up' : 'dn');
+    ['t-gold','t-gold2'].forEach(id => document.getElementById(id).textContent = (g.change>=0?'▲':'▼')+' $'+g.price.toFixed(0));
+  }
+
+  // Nat Gas + S&P ticker
+  const ng = latestPrices.ng;
+  if (ng) ['t-ng','t-ng2'].forEach(id => document.getElementById(id).textContent = (ng.change>=0?'▲':'▼')+' $'+ng.price.toFixed(3));
+  const sp = latestPrices.sp;
+  if (sp) ['t-sp','t-sp2'].forEach(id => document.getElementById(id).textContent = (sp.change>=0?'▲':'▼')+' '+sp.price.toFixed(0));
+}
+
+// ==========================================
+// PRICE CHART (Chart.js)
+// ==========================================
+async function loadPriceChart() {
+  // Try Yahoo historical first
+  const brentHist = await fetchYahooHistory('BZ=F', '1mo', '1d');
+  await new Promise(r => setTimeout(r, 400));
+  const wtiHist = await fetchYahooHistory('CL=F', '1mo', '1d');
+
+  if (brentHist && wtiHist && brentHist.length > 3) {
+    document.getElementById('chart-range-label').textContent = '(1 Month)';
+    renderPriceChart(brentHist, wtiHist);
+    return;
+  }
+
+  // Fallback: FRED (daily, last 60 days)
+  const startDate = new Date(); startDate.setDate(startDate.getDate() - 60);
+  const start = startDate.toISOString().split('T')[0];
+  const [fredBrent, fredWti] = await Promise.all([
+    fetchFred('DCOILBRENTEU', start),
+    fetchFred('DCOILWTICO', start),
+  ]);
+
+  if (fredBrent && fredWti) {
+    document.getElementById('chart-range-label').textContent = '(FRED — 60d)';
+    renderPriceChart(
+      fredBrent.map(d => ({ date: d.date, close: d.value })),
+      fredWti.map(d => ({ date: d.date, close: d.value }))
+    );
+  }
+}
+
+function renderPriceChart(brent, wti) {
+  if (charts.price) charts.price.destroy();
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  charts.price = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Brent',
+          data: brent.map(d => ({ x: d.date, y: d.close })),
+          borderColor: '#e8a020',
+          backgroundColor: 'rgba(232,160,32,0.08)',
+          borderWidth: 2, pointRadius: 0, fill: true, tension: 0.2,
+        },
+        {
+          label: 'WTI',
+          data: wti.map(d => ({ x: d.date, y: d.close })),
+          borderColor: '#2080e0',
+          backgroundColor: 'rgba(32,128,224,0.05)',
+          borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.2,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 10, usePointStyle: true, font: { size: 9 } } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}` } }
+      },
+      scales: {
+        x: { type: 'time', time: { unit: 'week' }, grid: { display: false } },
+        y: { grid: { color: 'rgba(30,37,48,0.8)' }, ticks: { callback: v => '$'+v } }
+      }
+    }
+  });
+}
+
+// ==========================================
+// EIA INVENTORY (keep original bar style — it's good)
+// ==========================================
+let eiaData = { inventory: [], sprData: [], prodData: [] };
+
+async function loadEIA() {
+  try {
+    const data = await fetchEia('petroleum/sum/sndw/data', {
+      frequency: 'weekly',
+      'data[0]': 'value',
+      'facets[series][]': 'WCESTUS1',
+      'sort[0][column]': 'period',
+      'sort[0][direction]': 'desc',
+      length: 12,
+    });
+    const rows = data?.response?.data;
+    if (!rows?.length) throw new Error('No EIA data');
+    eiaData.inventory = rows;
+
+    const FYR_AVG = 430000;
+    const latest = parseInt(rows[0].value);
+    const prev = parseInt(rows[1].value);
+    const wow = latest - prev;
+    const vsAvg = latest - FYR_AVG;
+    const vsAvgPct = (vsAvg / FYR_AVG * 100);
+
+    const wowColor = wow < 0 ? 'var(--red)' : 'var(--green)';
+    const avgColor = vsAvg < 0 ? 'var(--red)' : 'var(--green)';
+
+    let html = `<div class="eia-summary">
+      <div class="eia-stat">
+        <div class="eia-stat-label">Commercial Crude</div>
+        <div class="eia-stat-val">${(latest/1000).toFixed(0)}<span style="font-size:11px;color:var(--muted)"> MB</span></div>
+        <div class="eia-stat-sub" style="color:${wowColor}">${wow>=0?'+':''}${(wow/1000).toFixed(1)}MB WoW</div>
+      </div>
+      <div class="eia-stat">
+        <div class="eia-stat-label">vs 5yr Avg (430MB)</div>
+        <div class="eia-stat-val" style="color:${avgColor}">${vsAvg>=0?'+':''}${(vsAvg/1000).toFixed(0)}<span style="font-size:11px;color:var(--muted)"> MB</span></div>
+        <div class="eia-stat-sub" style="color:${avgColor}">${vsAvgPct>=0?'+':''}${vsAvgPct.toFixed(1)}%</div>
+      </div>
+      <div class="eia-stat">
+        <div class="eia-stat-label">Days of Supply</div>
+        <div class="eia-stat-val">${(latest/1000/20).toFixed(1)}<span style="font-size:11px;color:var(--muted)"> d</span></div>
+        <div class="eia-stat-sub" style="color:var(--muted)">@ 20 mb/d US demand</div>
+      </div>
+    </div>`;
+
+    const vals = rows.slice(0, 8).map(r => parseInt(r.value));
+    const minV = Math.min(...vals, FYR_AVG) - 5000;
+    const maxV = Math.max(...vals, FYR_AVG) + 5000;
+    const range = maxV - minV;
+    const avgPct = ((FYR_AVG - minV) / range * 100).toFixed(1);
+
+    rows.slice(0, 8).forEach(row => {
+      const val = parseInt(row.value);
+      const fillPct = ((val - minV) / range * 100).toFixed(1);
+      const diff = val - FYR_AVG;
+      const cls = diff > 10000 ? 'high' : diff > -10000 ? 'ok' : diff > -30000 ? 'med' : 'low';
+      const diffStr = (diff >= 0 ? '+' : '') + (diff/1000).toFixed(1) + 'MB';
+      const diffColor = diff < 0 ? 'var(--red)' : 'var(--green)';
+      html += `<div class="bar-row">
+        <div class="bar-label">${row.period}</div>
+        <div class="bar-track">
+          <div class="bar-fill ${cls}" style="width:${fillPct}%"></div>
+          <div class="bar-avg-line" style="left:${avgPct}%" title="5yr avg"></div>
+        </div>
+        <div class="bar-val">${(val/1000).toFixed(0)}MB<br><span style="color:${diffColor};font-size:8px">${diffStr}</span></div>
+      </div>`;
+    });
+
+    document.getElementById('eia-content').innerHTML = html;
+  } catch(e) {
+    document.getElementById('eia-content').innerHTML = `<div style="font-family:var(--mono);font-size:10px;color:var(--red)">EIA inventory load failed: ${e.message}</div>`;
+  }
+}
+
+// ==========================================
+// SPR DATA
+// ==========================================
+async function loadSPR() {
+  try {
+    const data = await fetchEia('petroleum/stoc/wstk/data', {
+      frequency: 'weekly',
+      'data[0]': 'value',
+      'facets[product][]': 'EPC0',
+      'facets[process][]': 'SAS',
+      'sort[0][column]': 'period',
+      'sort[0][direction]': 'desc',
+      length: 52,
+    });
+    const rows = data?.response?.data;
+    if (!rows?.length) return;
+    eiaData.sprData = rows;
+
+    const pts = rows.map(r => ({ date: r.period, value: parseInt(r.value) / 1000 })).reverse();
+    const latest = pts[pts.length - 1];
+    const yearAgo = pts[0];
+
+    document.getElementById('spr-info').textContent =
+      `Current: ${latest.value.toFixed(0)} MB | YoY: ${(latest.value - yearAgo.value >= 0 ? '+' : '')}${(latest.value - yearAgo.value).toFixed(0)} MB`;
+
+    if (charts.spr) charts.spr.destroy();
+    const ctx = document.getElementById('sprChart').getContext('2d');
+    charts.spr = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'SPR (MB)',
+          data: pts.map(d => ({ x: d.date, y: d.value })),
+          borderColor: '#e03030',
+          backgroundColor: 'rgba(224,48,48,0.1)',
+          borderWidth: 2, pointRadius: 0, fill: true, tension: 0.2,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(0) + ' MB' } } },
+        scales: {
+          x: { type: 'time', time: { unit: 'month' }, grid: { display: false } },
+          y: { grid: { color: 'rgba(30,37,48,0.8)' }, ticks: { callback: v => v + ' MB' } }
+        }
+      }
+    });
+  } catch(e) {
+    document.getElementById('spr-info').textContent = 'SPR data unavailable';
+  }
+}
+
+// ==========================================
+// US PRODUCTION
+// ==========================================
+async function loadProduction() {
+  try {
+    const data = await fetchEia('petroleum/crd/crpdn/data', {
+      frequency: 'monthly',
+      'data[0]': 'value',
+      'facets[duoarea][]': 'NUS-Z00',
+      'facets[product][]': 'EPC0',
+      'sort[0][column]': 'period',
+      'sort[0][direction]': 'desc',
+      length: 24,
+    });
+    const rows = data?.response?.data;
+    if (!rows?.length) return;
+    eiaData.prodData = rows;
+
+    const pts = rows.map(r => ({ date: r.period + '-01', value: parseInt(r.value) / 1000 })).reverse();
+    const latest = pts[pts.length - 1];
+    const yearAgo = pts.length > 12 ? pts[pts.length - 13] : pts[0];
+
+    document.getElementById('prod-info').textContent =
+      `Latest: ${latest.value.toFixed(1)} mb/d | YoY: ${(latest.value - yearAgo.value >= 0 ? '+' : '')}${(latest.value - yearAgo.value).toFixed(1)} mb/d`;
+
+    if (charts.prod) charts.prod.destroy();
+    const ctx = document.getElementById('prodChart').getContext('2d');
+    charts.prod = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'US Production (mb/d)',
+          data: pts.map(d => ({ x: d.date, y: d.value })),
+          borderColor: '#bc8cff',
+          backgroundColor: 'rgba(188,140,255,0.1)',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#bc8cff', fill: true, tension: 0.3,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(1) + ' mb/d' } } },
+        scales: {
+          x: { type: 'time', time: { unit: 'month' }, grid: { display: false } },
+          y: { grid: { color: 'rgba(30,37,48,0.8)' }, ticks: { callback: v => v + ' mb/d' } }
+        }
+      }
+    });
+  } catch(e) {
+    document.getElementById('prod-info').textContent = 'Production data unavailable';
+  }
+}
+
+// ==========================================
+// SPREAD CHART (Brent - WTI, 1Y)
+// ==========================================
+async function loadSpreadChart() {
+  const startDate = new Date(); startDate.setFullYear(startDate.getFullYear() - 1);
+  const start = startDate.toISOString().split('T')[0];
+
+  const [fredBrent, fredWti] = await Promise.all([
+    fetchFred('DCOILBRENTEU', start),
+    fetchFred('DCOILWTICO', start),
+  ]);
+
+  if (!fredBrent || !fredWti) return;
+
+  const spread = fredWti.map(w => {
+    const b = fredBrent.find(bp => bp.date === w.date);
+    return b ? { date: w.date, value: b.value - w.value } : null;
+  }).filter(Boolean);
+
+  if (!spread.length) return;
+
+  if (charts.spread) charts.spread.destroy();
+  const ctx = document.getElementById('spreadChart').getContext('2d');
+  charts.spread = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Brent-WTI ($)',
+        data: spread.map(d => ({ x: d.date, y: d.value })),
+        borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,0.08)',
+        borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.2,
+        segment: {
+          borderColor: ctx => (ctx.p0.parsed.y >= 0 ? '#20c060' : '#e03030'),
+        }
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + ctx.parsed.y.toFixed(2) } } },
+      scales: {
+        x: { type: 'time', time: { unit: 'month' }, grid: { display: false } },
+        y: { grid: { color: 'rgba(30,37,48,0.8)' }, ticks: { callback: v => '$' + v } }
+      }
+    }
+  });
+}
+
+// ==========================================
+// OVERSUPPLY INDEX
+// ==========================================
+function calculateOSI() {
+  let score = 50; // 0=tight, 100=oversupplied
+  let factors = [];
+
+  // Factor 1: Inventory vs 5yr avg (430MB)
+  if (eiaData.inventory.length > 0) {
+    const current = parseInt(eiaData.inventory[0].value) / 1000;
+    const diff = current - 430;
+    const impact = Math.max(-20, Math.min(20, (diff / 430) * 200));
+    score += impact;
+    factors.push(`Inv ${diff>=0?'+':''}${diff.toFixed(0)}MB vs avg → ${impact>=0?'+':''}${impact.toFixed(0)}`);
+  }
+
+  // Factor 2: Inventory trend (last 4 weeks)
+  if (eiaData.inventory.length >= 5) {
+    const recent = eiaData.inventory.slice(0, 5).map(r => parseInt(r.value));
+    const trend = (recent[0] - recent[4]) / 1000; // positive = building
+    const impact = Math.max(-10, Math.min(10, trend));
+    score += impact;
+    factors.push(`4wk trend ${trend>=0?'+':''}${trend.toFixed(0)}MB → ${impact>=0?'+':''}${impact.toFixed(0)}`);
+  }
+
+  // Factor 3: Price level
+  const brent = latestPrices.brent?.price;
+  if (brent) {
+    let impact = 0;
+    if (brent < 60) impact = 15;
+    else if (brent < 70) impact = 8;
+    else if (brent < 75) impact = 3;
+    else if (brent > 100) impact = -20;
+    else if (brent > 90) impact = -12;
+    else if (brent > 80) impact = -5;
+    score += impact;
+    factors.push(`Brent $${brent.toFixed(0)} → ${impact>=0?'+':''}${impact}`);
+  }
+
+  // Factor 4: Spread (wide = logistics tightness)
+  if (latestPrices.brent && latestPrices.wti) {
+    const spread = latestPrices.brent.price - latestPrices.wti.price;
+    let impact = 0;
+    if (spread > 8) impact = -5; // wide spread = tightness concerns
+    else if (spread < 2) impact = 5; // narrow = balanced
+    score += impact;
+    factors.push(`Spread $${spread.toFixed(1)} → ${impact>=0?'+':''}${impact}`);
+  }
+
+  // Factor 5: US production trend
+  if (eiaData.prodData.length >= 2) {
+    const latest = parseInt(eiaData.prodData[0].value);
+    const prev = parseInt(eiaData.prodData[1].value);
+    const growth = (latest - prev) / prev * 100;
+    const impact = Math.max(-5, Math.min(5, growth * 3));
+    score += impact;
+    factors.push(`Prod growth ${growth>=0?'+':''}${growth.toFixed(1)}% → ${impact>=0?'+':''}${impact.toFixed(0)}`);
+  }
+
+  // Factor 6: VIX (high fear = supply concern = less oversupply)
+  const vix = latestPrices.vix?.price;
+  if (vix) {
+    let impact = 0;
+    if (vix > 35) impact = -8;
+    else if (vix > 25) impact = -4;
+    else if (vix < 15) impact = 4;
+    score += impact;
+    factors.push(`VIX ${vix.toFixed(0)} → ${impact>=0?'+':''}${impact}`);
+  }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  // Update UI
+  document.getElementById('osi-marker').style.left = score + '%';
+  document.getElementById('osi-value').textContent = score;
+
+  const label = score > 70 ? 'OVERSUPPLIED' :
+                score > 58 ? 'LEAN OVERSUPPLY' :
+                score > 42 ? 'BALANCED' :
+                score > 30 ? 'LEAN TIGHT' : 'TIGHT SUPPLY';
+  document.getElementById('osi-label').textContent = label;
+
+  const color = score > 65 ? 'var(--green)' :
+                score > 45 ? 'var(--accent)' : 'var(--red)';
+  document.getElementById('osi-value').style.color = color;
+
+  console.log('OSI factors:', factors, 'Score:', score);
+}
+
+// ==========================================
+// NEWS RSS
+// ==========================================
+async function loadNews() {
+  const feeds = [
+    { url: 'https://www.eia.gov/rss/todayinenergy.xml', source: 'EIA' },
+    { url: 'https://news.google.com/rss/search?q=strait+of+hormuz+oil&hl=en-US&gl=US&ceid=US:en', source: 'GOOGLE' },
+    { url: 'https://news.google.com/rss/search?q=crude+oil+oversupply+OPEC&hl=en-US&gl=US&ceid=US:en', source: 'GOOGLE' },
+  ];
+
+  let allItems = [];
+
+  for (const feed of feeds) {
+    try {
+      const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=8`;
+      const r = await fetch(proxyUrl);
+      const data = await r.json();
+      if (data.status === 'ok' && data.items) {
+        allItems = allItems.concat(data.items.map(item => ({
+          title: item.title,
+          link: item.link,
+          pubDate: new Date(item.pubDate),
+          source: feed.source,
+        })));
+      }
+    } catch(e) { continue; }
+  }
+
+  // Sort by date, newest first
+  allItems.sort((a, b) => b.pubDate - a.pubDate);
+
+  const el = document.getElementById('news-content');
+  if (allItems.length === 0) {
+    el.innerHTML = `<div style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:8px 0;">
+      RSS feeds unavailable. Manual links:<br><br>
+      <a href="https://www.eia.gov/todayinenergy/" target="_blank" style="color:var(--accent)">EIA Today in Energy</a><br>
+      <a href="https://news.google.com/search?q=strait+of+hormuz+oil" target="_blank" style="color:var(--accent)">Google News: Hormuz</a><br>
+      <a href="https://www.reuters.com/business/energy/" target="_blank" style="color:var(--accent)">Reuters Energy</a><br>
+      <a href="https://oilprice.com/" target="_blank" style="color:var(--accent)">OilPrice.com</a>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = allItems.slice(0, 15).map(item => {
+    const timeStr = item.pubDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `<div class="news-item">
+      <div class="news-dot"></div>
+      <div>
+        <div class="news-text"><a href="${item.link}" target="_blank">${item.title}</a></div>
+        <div class="news-meta">${timeStr} · ${item.source}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ==========================================
+// LINKS & NOTES (persisted in localStorage)
+// ==========================================
+const LINKS = [
+  { src: 'REUTERS', text: 'Reuters Energy', url: 'https://www.reuters.com/business/energy/' },
+  { src: 'FT', text: 'FT — Oil & Gas', url: 'https://www.ft.com/oil-gas' },
+  { src: 'GOOGLE', text: 'Hormuz news', url: 'https://news.google.com/search?q=strait+of+hormuz+oil' },
+  { src: 'GOOGLE', text: 'OPEC supply', url: 'https://news.google.com/search?q=OPEC+oil+supply+production' },
+  { src: 'EIA', text: 'Weekly Petroleum Report', url: 'https://www.eia.gov/petroleum/supply/weekly/' },
+  { src: 'EIA', text: 'Short-Term Energy Outlook', url: 'https://www.eia.gov/outlooks/steo/' },
+  { src: 'TANKERS', text: 'MarineTraffic Hormuz', url: 'https://www.marinetraffic.com/en/ais/home/centerx:56.3/centery:26.5/zoom:7' },
+  { src: 'OILPRICE', text: 'OilPrice.com', url: 'https://oilprice.com/latest-energy-news/world-news/' },
+  { src: 'KPLER', text: 'Kpler flow tracker', url: 'https://www.kpler.com/' },
+  { src: 'CME', text: 'Crude Oil Futures', url: 'https://www.cmegroup.com/trading/energy/crude-oil/brent-crude-oil.html' },
+];
+
+let notes = JSON.parse(localStorage.getItem('hormuz_notes') || '[]');
+
+function renderLinks() {
+  const el = document.getElementById('links-content');
+  const n = notes.map((n,i) => `<div class="note-item"><div class="note-time">${n.time}</div><div class="link-text" style="color:#fff;flex:1">${n.text}</div><div class="note-del" onclick="delNote(${i})">×</div></div>`).join('');
+  const l = LINKS.map(l => `<div class="link-item"><div class="link-src">${l.src}</div><div class="link-text"><a href="${l.url}" target="_blank">${l.text}</a></div></div>`).join('');
+  el.innerHTML = n + l;
+}
+function addNote() {
+  const input = document.getElementById('note-input');
+  const text = input.value.trim();
+  if (!text) return;
+  notes.unshift({ text, time: new Date().toUTCString().slice(5,17) });
+  localStorage.setItem('hormuz_notes', JSON.stringify(notes));
+  input.value = ''; renderLinks();
+}
+function delNote(i) {
+  notes.splice(i,1);
+  localStorage.setItem('hormuz_notes', JSON.stringify(notes));
+  renderLinks();
+}
+
+// ==========================================
+// API STATUS
+// ==========================================
+let apiStatus = { yahoo: '?', eia: '?', fred: '?', rss: '?' };
+function updateApiStatus() {
+  const el = document.getElementById('api-status');
+  const fmt = (name, status) => {
+    const cls = status === 'ok' ? 'ok-badge' : status === 'err' ? 'error-badge' : '';
+    return `<span class="${cls}">${name}</span>`;
+  };
+  el.innerHTML = Object.entries(apiStatus).map(([k,v]) => fmt(k.toUpperCase(), v)).join(' ');
+}
+
+// ==========================================
+// MAIN REFRESH
+// ==========================================
+async function refreshAll() {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot';
+
+  try {
+    await loadPrices();
+    apiStatus.yahoo = latestPrices.brent ? 'ok' : 'err';
+  } catch(e) { apiStatus.yahoo = 'err'; }
+
+  try {
+    await loadEIA();
+    apiStatus.eia = eiaData.inventory.length > 0 ? 'ok' : 'err';
+  } catch(e) { apiStatus.eia = 'err'; }
+
+  // These can run in parallel
+  await Promise.allSettled([
+    loadSPR(),
+    loadProduction(),
+    loadPriceChart(),
+    loadSpreadChart().then(() => { apiStatus.fred = 'ok'; }).catch(() => { apiStatus.fred = 'err'; }),
+    loadNews().then(() => { apiStatus.rss = 'ok'; }).catch(() => { apiStatus.rss = 'err'; }),
+  ]);
+
+  calculateOSI();
+  updateApiStatus();
+  setLastUpdated();
+
+  const hasErrors = Object.values(apiStatus).some(v => v === 'err');
+  dot.className = hasErrors ? 'status-dot error' : 'status-dot';
+}
+
+// ==========================================
+// INIT
+// ==========================================
+window.addEventListener('load', () => {
+  renderLinks();
+  refreshAll();
+  setInterval(refreshAll, 5 * 60 * 1000); // Auto-refresh every 5 min
+});
+</script>
+</body>
+</html>
