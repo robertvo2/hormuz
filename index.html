@@ -743,44 +743,65 @@ async function loadNews() {
 // OVERSUPPLY INDEX
 // ==========================================
 function calculateOSI() {
-  let score = 50;
+  // Weighted-average approach: each component normalized to -1..1, weighted by importance
+  // Missing data sources are excluded (not counted as 0), preventing bias
+  const components = [];
+
+  // 1. Inventory level vs 5yr avg (weight 4 — most important fundamental)
   if (eiaData.inventory.length > 0) {
     const current = parseInt(eiaData.inventory[0].value) / 1000;
-    const diff = current - 430;
-    score += Math.max(-20, Math.min(20, (diff / 430) * 200));
+    const diff = current - 430; // vs 5yr avg 430 MB
+    components.push({ v: Math.max(-1, Math.min(1, diff / 50)), w: 4 }); // ±50 MB = full signal
   }
+  // 2. Inventory trend — 5-week direction (weight 2)
   if (eiaData.inventory.length >= 5) {
     const recent = eiaData.inventory.slice(0, 5).map(r => parseInt(r.value));
-    const trend = (recent[0] - recent[4]) / 1000;
-    score += Math.max(-10, Math.min(10, trend));
+    const trend = (recent[0] - recent[4]) / 1000; // MB change over 5 weeks
+    components.push({ v: Math.max(-1, Math.min(1, trend / 10)), w: 2 }); // ±10 MB = full signal
   }
+  // 3. Brent price level (weight 4 — strong market signal)
   const brent = latestPrices.brent?.price;
   if (brent) {
-    let impact = 0;
-    if (brent < 60) impact = 15; else if (brent < 70) impact = 8; else if (brent < 75) impact = 3;
-    else if (brent > 100) impact = -20; else if (brent > 90) impact = -12; else if (brent > 80) impact = -5;
-    score += impact;
+    let s = 0;
+    if (brent < 60) s = 0.75; else if (brent < 70) s = 0.4; else if (brent < 75) s = 0.15;
+    else if (brent > 100) s = -1; else if (brent > 90) s = -0.6; else if (brent > 80) s = -0.25;
+    components.push({ v: s, w: 4 });
   }
+  // 4. Brent-WTI spread (weight 1)
   if (latestPrices.brent && latestPrices.wti) {
     const spread = latestPrices.brent.price - latestPrices.wti.price;
-    if (spread > 8) score -= 5; else if (spread < 2) score += 5;
+    let s = 0;
+    if (spread > 8) s = -0.8; else if (spread > 5) s = -0.3;
+    else if (spread < 2) s = 0.8; else if (spread < 3) s = 0.3;
+    components.push({ v: s, w: 1 });
   }
+  // 5. US production growth (weight 1)
   if (eiaData.prodData.length >= 2) {
     const latest = parseInt(eiaData.prodData[0].value);
     const prev = parseInt(eiaData.prodData[1].value);
     const growth = (latest - prev) / prev * 100;
-    score += Math.max(-5, Math.min(5, growth * 3));
+    components.push({ v: Math.max(-1, Math.min(1, growth * 0.5)), w: 1 });
   }
+  // 6. VIX — fear gauge (weight 1.5)
   const vix = latestPrices.vix?.price;
   if (vix) {
-    if (vix > 35) score -= 8; else if (vix > 25) score -= 4; else if (vix < 15) score += 4;
+    let s = 0;
+    if (vix > 35) s = -1; else if (vix > 25) s = -0.5; else if (vix < 15) s = 0.5;
+    components.push({ v: s, w: 1.5 });
   }
 
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  // Weighted average: missing components excluded, not zeroed
+  const totalW = components.reduce((s, c) => s + c.w, 0);
+  const wSum = components.reduce((s, c) => s + c.v * c.w, 0);
+  const avg = totalW > 0 ? wSum / totalW : 0; // -1 (tight) to +1 (oversupply)
+  let score = Math.max(0, Math.min(100, Math.round(50 + avg * 45)));
+
+  const dataSources = components.length;
   document.getElementById('osi-marker').style.left = score + '%';
   document.getElementById('osi-value').textContent = score;
   const label = score > 70 ? 'OVERSUPPLIED' : score > 58 ? 'LEAN OVERSUPPLY' : score > 42 ? 'BALANCED' : score > 30 ? 'LEAN TIGHT' : 'TIGHT SUPPLY';
-  document.getElementById('osi-label').textContent = label;
+  const dataLabel = dataSources < 6 ? ` [${dataSources}/6]` : '';
+  document.getElementById('osi-label').textContent = label + dataLabel;
   const color = score > 65 ? 'var(--green)' : score > 45 ? 'var(--accent)' : 'var(--red)';
   document.getElementById('osi-value').style.color = color;
 }
