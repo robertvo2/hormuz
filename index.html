@@ -1037,61 +1037,61 @@ window.addEventListener('load', () => {
 const infoContent = {
   osi: {
     title: 'Oversupply Confidence Index (OSI)',
-    text: `<p>De OSI is een gewogen gemiddelde van <span class="info-term">10 indicatoren</span> die samen inschatten hoe waarschijnlijk een olie-overaanbod is. Score 0–100.</p>
-<p><span class="info-term">0–30 = Tight Supply</span> (rood): krapte op de markt, prijsdruk omhoog.<br>
+    text: `<p>The OSI is a weighted average of <span class="info-term">10 indicators</span> that together estimate the likelihood of an oil oversupply. Score 0–100.</p>
+<p><span class="info-term">0–30 = Tight Supply</span> (red): market scarcity, upward price pressure.<br>
 <span class="info-term">30–45 = Leaning Tight</span><br>
-<span class="info-term">45–55 = Balanced</span>: evenwicht tussen vraag en aanbod.<br>
+<span class="info-term">45–55 = Balanced</span>: equilibrium between supply and demand.<br>
 <span class="info-term">55–70 = Leaning Oversupplied</span><br>
-<span class="info-term">70–100 = Oversupplied</span> (groen): teveel aanbod, prijsdruk omlaag.</p>
-<p><span class="info-term">Componenten & gewichten:</span><br>
-Inventaris-verandering (5) · Inventaris vs 5jr-gem (5) · Productietrend (5) · SPR-niveau (5) · Prijstrend (4) · Crack Spread (3) · Term Structure (3) · VIX (2) · DXY (2) · Price Momentum (2)</p>
-<p>Elke component wordt genormaliseerd naar −1 (tight) tot +1 (oversupplied), vermenigvuldigd met zijn gewicht, en gemiddeld tot een eindscore.</p>`
+<span class="info-term">70–100 = Oversupplied</span> (green): excess supply, downward price pressure.</p>
+<p><span class="info-term">Components & weights:</span><br>
+Inventory change (5) · Inventory vs 5yr avg (5) · Production trend (5) · SPR level (5) · Price trend (4) · Crack Spread (3) · Term Structure (3) · VIX (2) · DXY (2) · Price Momentum (2)</p>
+<p>Each component is normalized to −1 (tight) to +1 (oversupplied), multiplied by its weight, and averaged into a final score.</p>`
   },
   price: {
-    title: 'Brent & WTI Prijsgrafiek',
-    text: `<p>Toont de recente prijsbeweging van <span class="info-term">Brent Crude</span> (internationaal referentiepunt, Noordzee-olie) en <span class="info-term">WTI</span> (West Texas Intermediate, Amerikaans referentiepunt) op 15-minuten basis.</p>
-<p><span class="info-term">Brent</span> is relevanter voor de Hormuz-context: ~20% van de wereldwijde oliehandel gaat door de Straat van Hormuz, en dit is overwegend Brent-geprijsde olie uit de Golfregio.</p>
-<p><span class="info-term">WTI</span> is het Amerikaanse referentiepunt. Het verschil (spread) geeft informatie over regionale vraag/aanbod-verschillen.</p>
-<p>Bron: Yahoo Finance (real-time met vertraging van ~15 min).</p>`
+    title: 'Brent & WTI Price Chart',
+    text: `<p>Shows recent price action for <span class="info-term">Brent Crude</span> (international benchmark, North Sea oil) and <span class="info-term">WTI</span> (West Texas Intermediate, US benchmark) on a 15-minute basis.</p>
+<p><span class="info-term">Brent</span> is more relevant for the Hormuz context: ~20% of global oil trade passes through the Strait of Hormuz, predominantly Brent-priced crude from the Gulf region.</p>
+<p><span class="info-term">WTI</span> is the US benchmark. The spread between them reflects regional supply/demand imbalances.</p>
+<p>Source: Yahoo Finance (~15 min delayed).</p>`
   },
   eia: {
-    title: 'EIA Crude Oil Inventaris',
-    text: `<p>Wekelijkse ruwe olievoorraden in de VS, gerapporteerd door de <span class="info-term">Energy Information Administration</span> (EIA, onderdeel van het US Dept. of Energy).</p>
-<p><span class="info-term">Balken</span> tonen de actuele voorraad per categorie (Cushing, SPR, etc.) vergeleken met het 5-jaar gemiddelde. Langer = hoger dan gemiddeld = meer voorraad.</p>
-<p><span class="info-term">Weekverandering</span>: een stijging (build) wijst op minder vraag of meer aanbod — bearish voor prijzen. Een daling (draw) wijst op meer vraag of minder aanbod — bullish.</p>
-<p>De VS is de grootste olieconsument ter wereld, dus deze data is een belangrijke barometer voor de globale markt, maar het is slechts één land.</p>`
+    title: 'EIA Crude Oil Inventory',
+    text: `<p>Weekly US crude oil stocks reported by the <span class="info-term">Energy Information Administration</span> (EIA, part of the US Dept. of Energy).</p>
+<p><span class="info-term">Bars</span> show current inventory per category (Cushing, SPR, etc.) compared to the 5-year average. Longer = above average = more inventory.</p>
+<p><span class="info-term">Weekly change</span>: an increase (build) suggests lower demand or higher supply — bearish for prices. A decrease (draw) suggests higher demand or lower supply — bullish.</p>
+<p>The US is the world's largest oil consumer, making this data a key barometer — but it reflects only one country.</p>`
   },
   global: {
     title: 'Global Supply Signals',
-    text: `<p>Vier marktindicatoren die samen een beeld geven van de wereldwijde oliemarkt:</p>
-<p><span class="info-term">Term Structure</span> (front vs 6 maanden forward): vergelijkt de prijs van Brent nú met het futures-contract over 6 maanden.<br>
-• <span class="info-term">Backwardation</span> (front > 6M): markt is nu krap, kopers betalen premie voor directe levering.<br>
-• <span class="info-term">Contango</span> (front < 6M): er is genoeg aanbod, toekomstige prijs is hoger door opslagkosten.</p>
-<p><span class="info-term">Price Momentum</span>: huidige Brent-prijs vs het 3-maands voortschrijdend gemiddelde. Toont of de trend stijgend of dalend is, en hoe sterk.</p>
-<p><span class="info-term">Gasoline Crack Spread</span>: (benzineprijs × 42) − Brent. Meet de raffinagmarge. Hoge crack = sterke vraag naar geraffineerde producten. Lage crack = zwakke vraag.</p>
-<p><span class="info-term">Dollar Index (DXY)</span>: olie wordt in dollars verhandeld. Sterke dollar (DXY >104) maakt olie duurder voor niet-dollar-landen → minder vraag → bearish.</p>`
+    text: `<p>Four market indicators providing a picture of the global oil market:</p>
+<p><span class="info-term">Term Structure</span> (front vs 6-month forward): compares today's Brent price with the futures contract 6 months out.<br>
+• <span class="info-term">Backwardation</span> (front > 6M): market is currently tight, buyers pay a premium for immediate delivery.<br>
+• <span class="info-term">Contango</span> (front < 6M): ample supply, future price is higher due to storage costs.</p>
+<p><span class="info-term">Price Momentum</span>: current Brent spot vs 3-month rolling average. Shows whether the trend is rising or falling, and how strongly.</p>
+<p><span class="info-term">Gasoline Crack Spread</span>: (gasoline price × 42) − Brent. Measures refining margin. High crack = strong demand for refined products. Low crack = weak demand.</p>
+<p><span class="info-term">Dollar Index (DXY)</span>: oil is traded in dollars. A strong dollar (DXY >104) makes oil more expensive for non-dollar countries → lower demand → bearish.</p>`
   },
   news: {
     title: 'Energy News Feed',
-    text: `<p>Live nieuwsfeed via RSS van diverse energiebronnen. Headlines worden automatisch opgehaald en ververst bij elke update-cyclus (3 min).</p>
-<p>Klik op een headline om het volledige artikel te openen. De <span class="info-term">quick links</span> onderaan bieden directe toegang tot de belangrijkste energie-nieuwsbronnen.</p>
-<p>Tip: nieuws over Hormuz, OPEC-besluiten, sancties, en geopolitieke spanningen heeft directe impact op de oliemarkt en de OSI-score.</p>`
+    text: `<p>Live news feed via RSS from various energy sources. Headlines are automatically fetched and refreshed every update cycle (3 min).</p>
+<p>Click any headline to open the full article. The <span class="info-term">quick links</span> below provide direct access to key energy news sources.</p>
+<p>Tip: news about Hormuz, OPEC decisions, sanctions, and geopolitical tensions has direct impact on oil markets and the OSI score.</p>`
   },
   spr: {
     title: 'Strategic Petroleum Reserve (SPR)',
-    text: `<p>De <span class="info-term">Strategic Petroleum Reserve</span> is de noodvoorraad ruwe olie van de VS, opgeslagen in zoutkoepels langs de Golf van Mexico.</p>
-<p>Historisch maximum: ~727 miljoen vaten. Na massale vrijgave in 2022 (voor prijsstabilisatie) sterk gedaald. De overheid vult langzaam bij.</p>
-<p><span class="info-term">Laag SPR-niveau</span> = minder buffer tegen supply-schokken (zoals een Hormuz-blokkade) → tight signal voor de OSI.<br>
-<span class="info-term">Hoog SPR-niveau</span> = meer buffer, minder kwetsbaar → oversupply signal.</p>
-<p>Bron: EIA Weekly Petroleum Status Report.</p>`
+    text: `<p>The <span class="info-term">Strategic Petroleum Reserve</span> is the US emergency crude oil stockpile, stored in salt caverns along the Gulf of Mexico.</p>
+<p>Historical peak: ~727 million barrels. After massive releases in 2022 (for price stabilization), levels dropped sharply. The government is slowly refilling.</p>
+<p><span class="info-term">Low SPR level</span> = less buffer against supply shocks (such as a Hormuz blockade) → tight signal for the OSI.<br>
+<span class="info-term">High SPR level</span> = more buffer, less vulnerable → oversupply signal.</p>
+<p>Source: EIA Weekly Petroleum Status Report.</p>`
   },
   prod: {
-    title: 'US Crude Oil Productie',
-    text: `<p>Wekelijkse ruwe olieproductie van de VS in miljoenen vaten per dag (Mb/d). De VS is momenteel de <span class="info-term">grootste olieproducent</span> ter wereld (~13.5 Mb/d).</p>
-<p><span class="info-term">Stijgende productie</span> = meer aanbod op de wereldmarkt → oversupply signal.<br>
-<span class="info-term">Dalende productie</span> = minder aanbod → tight supply signal.</p>
-<p>De grafiek toont de trend over de afgelopen maanden. Let op: dit is alleen US-productie. OPEC+ productie (Saudi-Arabië, Rusland, etc.) is minstens zo belangrijk maar niet real-time beschikbaar.</p>
-<p>Bron: EIA Weekly Petroleum Status Report.</p>`
+    title: 'US Crude Oil Production',
+    text: `<p>Weekly US crude oil production in million barrels per day (Mb/d). The US is currently the <span class="info-term">world's largest oil producer</span> (~13.5 Mb/d).</p>
+<p><span class="info-term">Rising production</span> = more supply on the global market → oversupply signal.<br>
+<span class="info-term">Falling production</span> = less supply → tight supply signal.</p>
+<p>The chart shows the trend over recent months. Note: this covers US production only. OPEC+ output (Saudi Arabia, Russia, etc.) is equally important but not available in real-time.</p>
+<p>Source: EIA Weekly Petroleum Status Report.</p>`
   }
 };
 
@@ -1100,7 +1100,7 @@ function showInfo(key) {
   if (!info) return;
   const overlay = document.getElementById('info-overlay');
   const popup = document.getElementById('info-popup-content');
-  popup.innerHTML = `<span class="info-close" onclick="hideInfo()">✕ SLUITEN</span><h3>${info.title}</h3>${info.text}`;
+  popup.innerHTML = `<span class="info-close" onclick="hideInfo()">✕ CLOSE</span><h3>${info.title}</h3>${info.text}`;
   overlay.classList.add('active');
 }
 function hideInfo() {
