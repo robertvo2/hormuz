@@ -329,7 +329,7 @@
 </div>
 
 <footer>
-  <span>Data: Yahoo Finance · EIA.gov · FRED · RSS feeds · MarineTraffic — Auto-refresh: 5 min</span>
+  <span>Data: Yahoo Finance · EIA.gov · FRED · RSS feeds · MarineTraffic — Auto-refresh: 3 min</span>
   <div>
     <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
   </div>
@@ -1103,7 +1103,7 @@ async function refreshAll() {
 window.addEventListener('load', () => {
   renderLinks();
   refreshAll();
-  setInterval(refreshAll, 5 * 60 * 1000); // Auto-refresh every 5 min
+  setInterval(refreshAll, 3 * 60 * 1000); // Auto-refresh every 3 min
 });
 </script>
 </body>
