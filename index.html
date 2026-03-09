@@ -830,37 +830,35 @@ async function loadPriceMomentum() {
 
 async function loadTermStructure() {
   try {
-    // Derive front-month and 6-month-out Brent contract symbols dynamically
+    // Term structure: BZ=F (front-month continuous) vs 6-month-out specific contract
     const monthCodes = ['F','G','H','J','K','M','N','Q','U','V','X','Z'];
     const now = new Date();
-    // Front month = current month + 1 (or +2 if past 20th = near expiry)
-    let fm = now.getMonth() + (now.getDate() > 20 ? 2 : 1);
-    let fmYear = now.getFullYear();
-    if (fm > 11) { fm -= 12; fmYear++; }
-    // 6-month-out contract
-    let sm = fm + 6;
-    let smYear = fmYear;
-    if (sm > 11) { sm -= 12; smYear++; }
-    const frontSym = 'BZ' + monthCodes[fm] + String(fmYear).slice(-2) + '.NYM';
-    const farSym = 'BZ' + monthCodes[sm] + String(smYear).slice(-2) + '.NYM';
-    // Fetch both contract prices
+    // Far contract: 6 months from now
+    let farMonth = now.getMonth() + 6;
+    let farYear = now.getFullYear();
+    if (farMonth > 11) { farMonth -= 12; farYear++; }
+    const farSym = 'BZ' + monthCodes[farMonth] + String(farYear).slice(-2) + '.NYM';
+    // Fetch front (continuous) and far (specific contract)
     await new Promise(r => setTimeout(r, 300));
-    const front = await fetchYahoo(frontSym);
+    const front = await fetchYahoo('BZ=F');
+    if (!front) return;
     await new Promise(r => setTimeout(r, 300));
     const far = await fetchYahoo(farSym);
-    if (!front || !far) {
-      // Fallback: use front-month (BZ=F) and estimate from 6mo history
-      const bz = await fetchYahoo('BZ=F');
-      if (!bz) return;
-      const hist = await fetchYahooHistory('BZ=F', '6mo', '1d');
-      if (!hist || hist.length < 20) return;
-      // Use 1-month-ago price as proxy for far contract pricing
-      const farProxy = hist[Math.max(0, hist.length - 22)].close;
-      globalData.termStructure = { front: bz.price, far: farProxy, spread: bz.price - farProxy, pct: ((bz.price - farProxy) / farProxy * 100), sym: 'BZ=F vs ~1M ago', fallback: true };
+    if (!far) {
+      // Try 7 months out as fallback
+      let altMonth = farMonth + 1;
+      let altYear = farYear;
+      if (altMonth > 11) { altMonth -= 12; altYear++; }
+      const altSym = 'BZ' + monthCodes[altMonth] + String(altYear).slice(-2) + '.NYM';
+      await new Promise(r => setTimeout(r, 300));
+      const altFar = await fetchYahoo(altSym);
+      if (altFar) {
+        const spread = front.price - altFar.price;
+        globalData.termStructure = { front: front.price, far: altFar.price, spread, pct: (spread / altFar.price * 100), sym: 'BZ=F vs ' + altSym, fallback: false };
+      } else return;
     } else {
       const spread = front.price - far.price;
-      const pct = (spread / far.price * 100);
-      globalData.termStructure = { front: front.price, far: far.price, spread, pct, sym: frontSym + ' vs ' + farSym, fallback: false };
+      globalData.termStructure = { front: front.price, far: far.price, spread, pct: (spread / far.price * 100), sym: 'BZ=F vs ' + farSym, fallback: false };
     }
     const ts = globalData.termStructure;
     const el = document.getElementById('gs-term');
@@ -870,7 +868,8 @@ async function loadTermStructure() {
     else if (ts.spread > -3) { el.textContent = 'MILD CONTANGO'; el.style.color = 'var(--accent)'; }
     else { el.textContent = 'CONTANGO'; el.style.color = 'var(--green)'; }
     const spEl = document.getElementById('gs-term-spread');
-    spEl.textContent = (ts.spread >= 0 ? '+' : '') + '$' + ts.spread.toFixed(2) + ' (' + (ts.pct >= 0 ? '+' : '') + ts.pct.toFixed(1) + '%)';
+    const lbl = ts.sym.replace('BZ=F','Front').replace('.NYM','');
+    spEl.textContent = lbl + ': ' + (ts.spread >= 0 ? '+' : '') + '$' + ts.spread.toFixed(2) + ' (' + (ts.pct >= 0 ? '+' : '') + ts.pct.toFixed(1) + '%)';
     spEl.style.color = ts.spread > 1 ? 'var(--red)' : ts.spread < -1 ? 'var(--green)' : 'var(--accent)';
     apiStatus.mkt = 'ok';
   } catch(e) { console.warn('Term structure error:', e); apiStatus.mkt = 'err'; }
