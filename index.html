@@ -271,7 +271,7 @@
     <div class="hormuz-stat"><span class="hs-label">Dollar (DXY)</span><span class="hs-value" id="gs-dxy">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">DXY Signal</span><span class="hs-value" id="gs-dxy-signal">—</span></div>
     <div style="font-family:var(--mono);font-size:7px;color:var(--dim);margin-top:4px;line-height:1.4">
-      Structure: spot vs 3M avg (FRED daily)<br>
+      Structure: spot vs 3M avg (Yahoo daily)<br>
       Crack: (RB×42)−Brent. &gt;$25 strong demand<br>
       DXY &gt;104 = strong $ = bearish oil
     </div>
@@ -320,7 +320,7 @@
 </div>
 
 <footer>
-  <span>Data: Yahoo Finance (prices, DXY, crack) · EIA.gov · FRED (market structure) · MarineTraffic — Auto-refresh: 3 min</span>
+  <span>Data: Yahoo Finance (prices, DXY, crack, market structure) · EIA.gov · MarineTraffic — Auto-refresh: 3 min</span>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
   </div>
@@ -415,26 +415,7 @@ async function fetchEia(route, params = {}) {
   return null;
 }
 
-const FRED_KEY = 'b77ecd40c7e0bf40a82c05bb68faedc0';
-async function fetchFred(seriesId, startDate) {
-  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_KEY}&file_type=json&observation_start=${startDate}&sort_order=asc`;
-  const parseFred = (data) => data.observations?.filter(o => o.value !== '.').map(o => ({ date: o.date, value: parseFloat(o.value) }));
-  // Try direct, then allorigins proxy, then corsproxy
-  try {
-    const r = await fetch(url);
-    if (r.ok) { const data = await r.json(); return parseFred(data); }
-  } catch(e) {}
-  try {
-    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    const j = await r.json();
-    return parseFred(JSON.parse(j.contents));
-  } catch(e) {}
-  try {
-    const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-    if (r.ok) { const data = await r.json(); return parseFred(data); }
-  } catch(e) {}
-  return null;
-}
+// FRED removed — using Yahoo Finance for all market data (more reliable, real-time)
 
 // ==========================================
 // PRICE LOADING
@@ -557,13 +538,11 @@ async function loadPriceChart() {
     renderPriceChart(brentHist, wtiHist, 'hour');
     return;
   }
-  // FRED fallback (daily)
-  const startDate = new Date(); startDate.setDate(startDate.getDate() - 10);
-  const start = startDate.toISOString().split('T')[0];
-  const [fredBrent, fredWti] = await Promise.all([fetchFred('DCOILBRENTEU', start), fetchFred('DCOILWTICO', start)]);
-  if (fredBrent && fredWti) {
-    document.getElementById('chart-range-label').textContent = '(FRED — 7d)';
-    renderPriceChart(fredBrent.map(d => ({ date: d.date, close: d.value })), fredWti.map(d => ({ date: d.date, close: d.value })), 'day');
+  // Yahoo daily fallback
+  const [dailyBrent, dailyWti] = await Promise.all([fetchYahooHistory('BZ=F', '7d', '1d'), fetchYahooHistory('CL=F', '7d', '1d')]);
+  if (dailyBrent && dailyWti) {
+    document.getElementById('chart-range-label').textContent = '(Yahoo — 7d daily)';
+    renderPriceChart(dailyBrent, dailyWti, 'day');
   }
 }
 
@@ -778,14 +757,16 @@ async function loadNews() {
 // ==========================================
 async function loadGlobalIndicators() {
   try {
+    // Stagger after loadPrices to avoid proxy rate-limiting on initial load
+    await new Promise(r => setTimeout(r, 2000));
     // Heating Oil futures
     const ho = await fetchYahoo('HO=F');
     if (ho) globalData.ho = ho;
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 500));
     // RBOB Gasoline futures
     const rb = await fetchYahoo('RB=F');
     if (rb) globalData.rb = rb;
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 500));
     // Dollar Index
     const dxy = await fetchYahoo('DX-Y.NYB');
     if (dxy) globalData.dxy = dxy;
@@ -825,17 +806,15 @@ function updateGlobalPanel() {
 
 async function loadMarketStructure() {
   try {
-    // Short delay to stagger FRED requests (fetchFred now has CORS proxy fallback)
-    await new Promise(r => setTimeout(r, 2000));
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 6);
-    const start = startDate.toISOString().split('T')[0];
-    const brentHist = await fetchFred('DCOILBRENTEU', start);
+    // Delay to stagger after other Yahoo calls
+    await new Promise(r => setTimeout(r, 4000));
+    // Use Yahoo Finance 6-month Brent history (real-time, no API key needed)
+    const brentHist = await fetchYahooHistory('BZ=F', '6mo', '1d');
     if (!brentHist || brentHist.length < 20) return;
-    const latest = brentHist[brentHist.length - 1].value;
+    const latest = brentHist[brentHist.length - 1].close;
     // 3-month rolling average (~63 trading days)
-    const window = Math.min(63, brentHist.length);
-    const avg3m = brentHist.slice(-window).reduce((s, d) => s + d.value, 0) / window;
+    const win = Math.min(63, brentHist.length);
+    const avg3m = brentHist.slice(-win).reduce((s, d) => s + d.close, 0) / win;
     const deviation = ((latest - avg3m) / avg3m * 100);
     globalData.marketStructure = { spot: latest, avg3m, deviation };
     const el = document.getElementById('gs-structure');
@@ -847,7 +826,8 @@ async function loadMarketStructure() {
     const momEl = document.getElementById('gs-momentum');
     momEl.textContent = (deviation >= 0 ? '+' : '') + deviation.toFixed(1) + '% ($' + latest.toFixed(2) + ' vs $' + avg3m.toFixed(2) + ')';
     momEl.style.color = deviation > 2 ? 'var(--red)' : deviation < -2 ? 'var(--green)' : 'var(--accent)';
-  } catch(e) { console.warn('Market structure error:', e); }
+    apiStatus.mkt = 'ok'; // reuse fred status slot for market structure
+  } catch(e) { console.warn('Market structure error:', e); apiStatus.mkt = 'err'; }
 }
 
 // ==========================================
@@ -947,7 +927,7 @@ function calculateOSI() {
 // ==========================================
 // API STATUS
 // ==========================================
-let apiStatus = { yahoo: '?', eia: '?', fred: '?', rss: '?' };
+let apiStatus = { yahoo: '?', eia: '?', mkt: '?', rss: '?' };
 function updateApiStatus() {
   const el = document.getElementById('api-status');
   const fmt = (name, status) => `<span class="${status === 'ok' ? 'ok-badge' : status === 'err' ? 'error-badge' : ''}">${name}</span>`;
@@ -965,7 +945,7 @@ async function refreshAll() {
   await Promise.allSettled([
     loadSPR(),
     loadProduction(),
-    loadPriceChart().then(() => { apiStatus.fred = 'ok'; }).catch(() => { apiStatus.fred = 'err'; }),
+    loadPriceChart(),
     loadNews(),
     loadGlobalIndicators(),
     loadMarketStructure(),
