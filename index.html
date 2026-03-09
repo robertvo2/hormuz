@@ -418,12 +418,22 @@ async function fetchEia(route, params = {}) {
 const FRED_KEY = 'b77ecd40c7e0bf40a82c05bb68faedc0';
 async function fetchFred(seriesId, startDate) {
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_KEY}&file_type=json&observation_start=${startDate}&sort_order=asc`;
+  const parseFred = (data) => data.observations?.filter(o => o.value !== '.').map(o => ({ date: o.date, value: parseFloat(o.value) }));
+  // Try direct, then allorigins proxy, then corsproxy
   try {
     const r = await fetch(url);
-    if (!r.ok) return null;
-    const data = await r.json();
-    return data.observations?.filter(o => o.value !== '.').map(o => ({ date: o.date, value: parseFloat(o.value) }));
-  } catch(e) { return null; }
+    if (r.ok) { const data = await r.json(); return parseFred(data); }
+  } catch(e) {}
+  try {
+    const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+    const j = await r.json();
+    return parseFred(JSON.parse(j.contents));
+  } catch(e) {}
+  try {
+    const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+    if (r.ok) { const data = await r.json(); return parseFred(data); }
+  } catch(e) {}
+  return null;
 }
 
 // ==========================================
@@ -791,10 +801,11 @@ function updateGlobalPanel() {
     globalData.crack = crack;
     const el = document.getElementById('gs-crack');
     el.textContent = '$' + crack.toFixed(2) + '/bbl';
-    el.style.color = crack > 25 ? 'var(--green)' : crack > 15 ? 'var(--accent)' : 'var(--red)';
+    el.style.color = crack > 25 ? 'var(--green)' : crack > 15 ? 'var(--accent)' : crack > 10 ? 'var(--muted)' : 'var(--red)';
     const sig = document.getElementById('gs-crack-signal');
     if (crack > 25) { sig.textContent = 'STRONG DEMAND'; sig.style.color = 'var(--green)'; }
     else if (crack > 15) { sig.textContent = 'NORMAL DEMAND'; sig.style.color = 'var(--accent)'; }
+    else if (crack > 10) { sig.textContent = 'SOFTENING'; sig.style.color = 'var(--muted)'; }
     else { sig.textContent = 'WEAK DEMAND'; sig.style.color = 'var(--red)'; }
     ['t-crack','t-crack2'].forEach(id => document.getElementById(id).textContent = '$' + crack.toFixed(1));
   }
@@ -814,17 +825,12 @@ function updateGlobalPanel() {
 
 async function loadMarketStructure() {
   try {
-    // Delay to avoid FRED rate-limiting (loadPriceChart also uses FRED as fallback)
-    await new Promise(r => setTimeout(r, 4000));
+    // Short delay to stagger FRED requests (fetchFred now has CORS proxy fallback)
+    await new Promise(r => setTimeout(r, 2000));
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 6);
     const start = startDate.toISOString().split('T')[0];
-    let brentHist = await fetchFred('DCOILBRENTEU', start);
-    // Retry once after 3s if first attempt fails
-    if (!brentHist || brentHist.length < 20) {
-      await new Promise(r => setTimeout(r, 3000));
-      brentHist = await fetchFred('DCOILBRENTEU', start);
-    }
+    const brentHist = await fetchFred('DCOILBRENTEU', start);
     if (!brentHist || brentHist.length < 20) return;
     const latest = brentHist[brentHist.length - 1].value;
     // 3-month rolling average (~63 trading days)
