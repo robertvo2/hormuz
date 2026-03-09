@@ -169,6 +169,8 @@
       <span class="ticker-item"><span class="sym">NAT GAS</span><span id="t-ng">...</span></span>
       <span class="ticker-item"><span class="sym">S&amp;P 500</span><span id="t-sp">...</span></span>
       <span class="ticker-item"><span class="sym">SPREAD</span><span id="t-spread">...</span></span>
+      <span class="ticker-item"><span class="sym">DXY</span><span id="t-dxy">...</span></span>
+      <span class="ticker-item"><span class="sym">CRACK</span><span id="t-crack">...</span></span>
       <span class="ticker-item"><span class="sym">BRENT</span><span id="t-brent2">...</span></span>
       <span class="ticker-item"><span class="sym">WTI</span><span id="t-wti2">...</span></span>
       <span class="ticker-item"><span class="sym">VIX</span><span id="t-vix2">...</span></span>
@@ -177,6 +179,8 @@
       <span class="ticker-item"><span class="sym">NAT GAS</span><span id="t-ng2">...</span></span>
       <span class="ticker-item"><span class="sym">S&amp;P 500</span><span id="t-sp2">...</span></span>
       <span class="ticker-item"><span class="sym">SPREAD</span><span id="t-spread2">...</span></span>
+      <span class="ticker-item"><span class="sym">DXY</span><span id="t-dxy2">...</span></span>
+      <span class="ticker-item"><span class="sym">CRACK</span><span id="t-crack2">...</span></span>
     </div>
   </div>
 </div>
@@ -221,7 +225,7 @@
   <div class="oversupply-header">
     <div>
       <div class="label">Oversupply Confidence Index</div>
-      <div class="sublabel">Composite: Inventory + trend, price, spread, production, VIX</div>
+      <div class="sublabel">Composite: Inventory, price, crack spread, market structure, DXY, VIX</div>
     </div>
     <div style="text-align:right;display:flex;align-items:center;gap:8px">
       <div class="sublabel" id="osi-label">Calculating...</div>
@@ -255,22 +259,27 @@
     </div>
   </div>
 
-  <!-- Hormuz Stats (col 4, row 1) -->
+  <!-- Global Supply Signals (col 4, row 1) -->
   <div class="panel g-hormuz">
-    <div class="panel-title">Strait of Hormuz — Risk</div>
-    <div class="hormuz-stat"><span class="hs-label">Daily Transit</span><span class="hs-value" id="hz-transit">~20.5 mb/d</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Global Oil</span><span class="hs-value">~21%</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Global LNG</span><span class="hs-value">~25%</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Producers</span><span class="hs-value">SA, IR, IQ, UAE, KW, QA</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Bypass Cap.</span><span class="hs-value">~6.5 mb/d (pipelines)</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Disruption Risk</span><span class="hs-value" id="hz-risk" style="color:var(--accent)">MODERATE</span></div>
-    <div class="hormuz-stat"><span class="hs-label">Iran Exports</span><span class="hs-value" id="hz-iran">~1.5 mb/d</span></div>
-    <div style="font-family:var(--mono);font-size:7px;color:var(--dim);margin-top:4px">⚠ AIS data requires paid sub. Values from EIA/IEA reports.</div>
+    <div class="panel-title">Global Supply Signals</div>
+    <div class="hormuz-stat"><span class="hs-label">Market Structure</span><span class="hs-value" id="gs-structure">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Spot vs 3M Avg</span><span class="hs-value" id="gs-momentum">—</span></div>
+    <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
+    <div class="hormuz-stat"><span class="hs-label">Gasoline Crack</span><span class="hs-value" id="gs-crack">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Crack Signal</span><span class="hs-value" id="gs-crack-signal">—</span></div>
+    <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
+    <div class="hormuz-stat"><span class="hs-label">Dollar (DXY)</span><span class="hs-value" id="gs-dxy">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">DXY Signal</span><span class="hs-value" id="gs-dxy-signal">—</span></div>
+    <div style="font-family:var(--mono);font-size:7px;color:var(--dim);margin-top:4px;line-height:1.4">
+      Structure: spot vs 3M avg (FRED daily)<br>
+      Crack: (RB×42)−Brent. &gt;$25 strong demand<br>
+      DXY &gt;104 = strong $ = bearish oil
+    </div>
     <div class="quick-links" style="margin-top:auto">
       <a href="https://www.reuters.com/business/energy/" target="_blank">Reuters</a>
       <a href="https://www.ft.com/oil-gas" target="_blank">FT</a>
       <a href="https://oilprice.com/" target="_blank">OilPrice</a>
-      <a href="https://www.marinetraffic.com/en/ais/home/centerx:56.3/centery:26.5/zoom:7" target="_blank">AIS Full</a>
+      <a href="https://www.cmegroup.com/markets/energy/crude-oil/brent-crude-oil.html" target="_blank">CME Brent</a>
     </div>
   </div>
 
@@ -311,7 +320,7 @@
 </div>
 
 <footer>
-  <span>Data: Yahoo Finance · EIA.gov · FRED · MarineTraffic — Auto-refresh: 3 min</span>
+  <span>Data: Yahoo Finance (prices, DXY, crack) · EIA.gov · FRED (market structure) · MarineTraffic — Auto-refresh: 3 min</span>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
   </div>
@@ -381,7 +390,7 @@ async function fetchYahooHistory(symbol, range, interval) {
       const ts = result.timestamp;
       const quotes = result.indicators.quote[0];
       return ts.map((t, i) => ({
-        date: new Date(t * 1000).toISOString().split('T')[0],
+        date: new Date(t * 1000).toISOString(),
         close: quotes.close[i],
       })).filter(d => d.close !== null);
     } catch(e) { continue; }
@@ -421,6 +430,7 @@ async function fetchFred(seriesId, startDate) {
 // PRICE LOADING
 // ==========================================
 let latestPrices = {};
+let globalData = { ho: null, rb: null, dxy: null, marketStructure: null };
 
 async function loadPrices() {
   const symbols = [
@@ -516,24 +526,38 @@ function updatePriceTiles() {
 // PRICE CHART
 // ==========================================
 async function loadPriceChart() {
-  const brentHist = await fetchYahooHistory('BZ=F', '5d', '1h');
+  // Try 2-day intraday view (15min intervals for detail)
+  const brentHist = await fetchYahooHistory('BZ=F', '5d', '15m');
   await new Promise(r => setTimeout(r, 400));
-  const wtiHist = await fetchYahooHistory('CL=F', '5d', '1h');
+  const wtiHist = await fetchYahooHistory('CL=F', '5d', '15m');
   if (brentHist && wtiHist && brentHist.length > 3) {
-    document.getElementById('chart-range-label').textContent = '(1 Week)';
-    renderPriceChart(brentHist, wtiHist);
+    // Filter to last ~2 trading days
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 2);
+    const cutStr = cutoff.toISOString();
+    const brent2d = brentHist.filter(d => d.date >= cutStr);
+    const wti2d = wtiHist.filter(d => d.date >= cutStr);
+    if (brent2d.length > 3) {
+      document.getElementById('chart-range-label').textContent = '(2 Days — 15min)';
+      renderPriceChart(brent2d, wti2d, 'hour');
+      return;
+    }
+    // Fallback: use all 5d data
+    document.getElementById('chart-range-label').textContent = '(5 Days — 15min)';
+    renderPriceChart(brentHist, wtiHist, 'hour');
     return;
   }
+  // FRED fallback (daily)
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 10);
   const start = startDate.toISOString().split('T')[0];
   const [fredBrent, fredWti] = await Promise.all([fetchFred('DCOILBRENTEU', start), fetchFred('DCOILWTICO', start)]);
   if (fredBrent && fredWti) {
     document.getElementById('chart-range-label').textContent = '(FRED — 7d)';
-    renderPriceChart(fredBrent.map(d => ({ date: d.date, close: d.value })), fredWti.map(d => ({ date: d.date, close: d.value })));
+    renderPriceChart(fredBrent.map(d => ({ date: d.date, close: d.value })), fredWti.map(d => ({ date: d.date, close: d.value })), 'day');
   }
 }
 
-function renderPriceChart(brent, wti) {
+function renderPriceChart(brent, wti, timeUnit) {
   if (charts.price) charts.price.destroy();
   const ctx = document.getElementById('priceChart').getContext('2d');
   charts.price = new Chart(ctx, {
@@ -549,7 +573,7 @@ function renderPriceChart(brent, wti) {
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 8, usePointStyle: true, font: { size: 8 } } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}` } } },
       scales: {
-        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'MMM d, HH:mm' }, grid: { display: false } },
+        x: { type: 'time', time: { unit: timeUnit || 'hour', tooltipFormat: 'MMM d, HH:mm' }, grid: { display: false } },
         y: { grid: { color: 'rgba(30,37,48,0.8)' }, ticks: { callback: v => '$'+v } }
       }
     }
@@ -740,34 +764,135 @@ async function loadNews() {
 }
 
 // ==========================================
+// GLOBAL SUPPLY SIGNALS
+// ==========================================
+async function loadGlobalIndicators() {
+  try {
+    // Heating Oil futures
+    const ho = await fetchYahoo('HO=F');
+    if (ho) globalData.ho = ho;
+    await new Promise(r => setTimeout(r, 300));
+    // RBOB Gasoline futures
+    const rb = await fetchYahoo('RB=F');
+    if (rb) globalData.rb = rb;
+    await new Promise(r => setTimeout(r, 300));
+    // Dollar Index
+    const dxy = await fetchYahoo('DX-Y.NYB');
+    if (dxy) globalData.dxy = dxy;
+    updateGlobalPanel();
+  } catch(e) { console.warn('Global indicators error:', e); }
+}
+
+function updateGlobalPanel() {
+  const b = latestPrices.brent;
+  // Crack Spread: (RB × 42) - Brent — measures refinery demand
+  if (globalData.rb && b) {
+    const crack = (globalData.rb.price * 42) - b.price;
+    globalData.crack = crack;
+    const el = document.getElementById('gs-crack');
+    el.textContent = '$' + crack.toFixed(2) + '/bbl';
+    el.style.color = crack > 25 ? 'var(--green)' : crack > 15 ? 'var(--accent)' : 'var(--red)';
+    const sig = document.getElementById('gs-crack-signal');
+    if (crack > 25) { sig.textContent = 'STRONG DEMAND'; sig.style.color = 'var(--green)'; }
+    else if (crack > 15) { sig.textContent = 'NORMAL DEMAND'; sig.style.color = 'var(--accent)'; }
+    else { sig.textContent = 'WEAK DEMAND'; sig.style.color = 'var(--red)'; }
+    ['t-crack','t-crack2'].forEach(id => document.getElementById(id).textContent = '$' + crack.toFixed(1));
+  }
+  // DXY — strong dollar = bearish oil (expensive for non-USD buyers)
+  if (globalData.dxy) {
+    const dxy = globalData.dxy;
+    const el = document.getElementById('gs-dxy');
+    el.textContent = dxy.price.toFixed(2) + ' (' + (dxy.change>=0?'+':'') + dxy.pct.toFixed(1) + '%)';
+    const sig = document.getElementById('gs-dxy-signal');
+    if (dxy.price > 106) { sig.textContent = 'STRONG $ — BEARISH OIL'; sig.style.color = 'var(--red)'; }
+    else if (dxy.price > 100) { sig.textContent = 'FIRM $ — MILD BEARISH'; sig.style.color = 'var(--accent)'; }
+    else if (dxy.price > 95) { sig.textContent = 'NEUTRAL $'; sig.style.color = 'var(--text)'; }
+    else { sig.textContent = 'WEAK $ — BULLISH OIL'; sig.style.color = 'var(--green)'; }
+    ['t-dxy','t-dxy2'].forEach(id => document.getElementById(id).textContent = dxy.price.toFixed(1));
+  }
+}
+
+async function loadMarketStructure() {
+  try {
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 6);
+    const start = startDate.toISOString().split('T')[0];
+    const brentHist = await fetchFred('DCOILBRENTEU', start);
+    if (!brentHist || brentHist.length < 20) return;
+    const latest = brentHist[brentHist.length - 1].value;
+    // 3-month rolling average (~63 trading days)
+    const window = Math.min(63, brentHist.length);
+    const avg3m = brentHist.slice(-window).reduce((s, d) => s + d.value, 0) / window;
+    const deviation = ((latest - avg3m) / avg3m * 100);
+    globalData.marketStructure = { spot: latest, avg3m, deviation };
+    const el = document.getElementById('gs-structure');
+    if (deviation > 5) { el.textContent = 'BACKWARDATION'; el.style.color = 'var(--red)'; }
+    else if (deviation > 1) { el.textContent = 'MILD BACKWARDATION'; el.style.color = 'var(--accent)'; }
+    else if (deviation > -1) { el.textContent = 'FLAT'; el.style.color = 'var(--text)'; }
+    else if (deviation > -5) { el.textContent = 'MILD CONTANGO'; el.style.color = 'var(--accent)'; }
+    else { el.textContent = 'CONTANGO'; el.style.color = 'var(--green)'; }
+    const momEl = document.getElementById('gs-momentum');
+    momEl.textContent = (deviation >= 0 ? '+' : '') + deviation.toFixed(1) + '% ($' + latest.toFixed(2) + ' vs $' + avg3m.toFixed(2) + ')';
+    momEl.style.color = deviation > 2 ? 'var(--red)' : deviation < -2 ? 'var(--green)' : 'var(--accent)';
+  } catch(e) { console.warn('Market structure error:', e); }
+}
+
+// ==========================================
 // OVERSUPPLY INDEX
 // ==========================================
 function calculateOSI() {
   // Weighted-average approach: each component normalized to -1..1, weighted by importance
   // Missing data sources are excluded (not counted as 0), preventing bias
+  // Positive = oversupply signal, Negative = tight supply signal
   const components = [];
+  const maxSources = 9;
 
-  // 1. Inventory level vs 5yr avg (weight 4 — most important fundamental)
+  // 1. US Inventory level vs 5yr avg (weight 2 — US proxy for global stocks)
   if (eiaData.inventory.length > 0) {
     const current = parseInt(eiaData.inventory[0].value) / 1000;
-    const diff = current - 430; // vs 5yr avg 430 MB
-    components.push({ v: Math.max(-1, Math.min(1, diff / 50)), w: 4 }); // ±50 MB = full signal
+    const diff = current - 430;
+    components.push({ v: Math.max(-1, Math.min(1, diff / 50)), w: 2 });
   }
-  // 2. Inventory trend — 5-week direction (weight 2)
+  // 2. Inventory trend — 5-week direction (weight 1.5)
   if (eiaData.inventory.length >= 5) {
     const recent = eiaData.inventory.slice(0, 5).map(r => parseInt(r.value));
-    const trend = (recent[0] - recent[4]) / 1000; // MB change over 5 weeks
-    components.push({ v: Math.max(-1, Math.min(1, trend / 10)), w: 2 }); // ±10 MB = full signal
+    const trend = (recent[0] - recent[4]) / 1000;
+    components.push({ v: Math.max(-1, Math.min(1, trend / 10)), w: 1.5 });
   }
-  // 3. Brent price level (weight 4 — strong market signal)
+  // 3. Brent price level (weight 3 — global benchmark)
   const brent = latestPrices.brent?.price;
   if (brent) {
     let s = 0;
     if (brent < 60) s = 0.75; else if (brent < 70) s = 0.4; else if (brent < 75) s = 0.15;
     else if (brent > 100) s = -1; else if (brent > 90) s = -0.6; else if (brent > 80) s = -0.25;
-    components.push({ v: s, w: 4 });
+    components.push({ v: s, w: 3 });
   }
-  // 4. Brent-WTI spread (weight 1)
+  // 4. Market Structure — spot vs 3M avg (weight 3 — direct oversupply measure)
+  if (globalData.marketStructure) {
+    const dev = globalData.marketStructure.deviation;
+    // Positive deviation = backwardation = tight, Negative = contango = oversupply
+    components.push({ v: Math.max(-1, Math.min(1, -dev / 10)), w: 3 });
+  }
+  // 5. Crack Spread — refinery demand (weight 2.5 — global demand signal)
+  if (globalData.crack !== undefined) {
+    let s = 0;
+    if (globalData.crack > 30) s = -0.8; // very strong demand = tight
+    else if (globalData.crack > 20) s = -0.3;
+    else if (globalData.crack < 5) s = 0.8; // weak demand = oversupply
+    else if (globalData.crack < 10) s = 0.4;
+    components.push({ v: s, w: 2.5 });
+  }
+  // 6. DXY — dollar strength (weight 2 — global purchasing power)
+  if (globalData.dxy) {
+    const dxy = globalData.dxy.price;
+    let s = 0;
+    if (dxy > 108) s = 0.8; // very strong $ = reduced global demand = oversupply
+    else if (dxy > 104) s = 0.3;
+    else if (dxy < 95) s = -0.6; // weak $ = cheap oil globally = more demand = tight
+    else if (dxy < 98) s = -0.2;
+    components.push({ v: s, w: 2 });
+  }
+  // 7. Brent-WTI spread (weight 1 — Atlantic basin indicator)
   if (latestPrices.brent && latestPrices.wti) {
     const spread = latestPrices.brent.price - latestPrices.wti.price;
     let s = 0;
@@ -775,14 +900,14 @@ function calculateOSI() {
     else if (spread < 2) s = 0.8; else if (spread < 3) s = 0.3;
     components.push({ v: s, w: 1 });
   }
-  // 5. US production growth (weight 1)
+  // 8. US production growth (weight 1)
   if (eiaData.prodData.length >= 2) {
     const latest = parseInt(eiaData.prodData[0].value);
     const prev = parseInt(eiaData.prodData[1].value);
     const growth = (latest - prev) / prev * 100;
     components.push({ v: Math.max(-1, Math.min(1, growth * 0.5)), w: 1 });
   }
-  // 6. VIX — fear gauge (weight 1.5)
+  // 9. VIX — fear gauge (weight 1.5)
   const vix = latestPrices.vix?.price;
   if (vix) {
     let s = 0;
@@ -793,14 +918,14 @@ function calculateOSI() {
   // Weighted average: missing components excluded, not zeroed
   const totalW = components.reduce((s, c) => s + c.w, 0);
   const wSum = components.reduce((s, c) => s + c.v * c.w, 0);
-  const avg = totalW > 0 ? wSum / totalW : 0; // -1 (tight) to +1 (oversupply)
+  const avg = totalW > 0 ? wSum / totalW : 0;
   let score = Math.max(0, Math.min(100, Math.round(50 + avg * 45)));
 
   const dataSources = components.length;
   document.getElementById('osi-marker').style.left = score + '%';
   document.getElementById('osi-value').textContent = score;
   const label = score > 70 ? 'OVERSUPPLIED' : score > 58 ? 'LEAN OVERSUPPLY' : score > 42 ? 'BALANCED' : score > 30 ? 'LEAN TIGHT' : 'TIGHT SUPPLY';
-  const dataLabel = dataSources < 6 ? ` [${dataSources}/6]` : '';
+  const dataLabel = dataSources < maxSources ? ` [${dataSources}/${maxSources}]` : '';
   document.getElementById('osi-label').textContent = label + dataLabel;
   const color = score > 65 ? 'var(--green)' : score > 45 ? 'var(--accent)' : 'var(--red)';
   document.getElementById('osi-value').style.color = color;
@@ -829,6 +954,8 @@ async function refreshAll() {
     loadProduction(),
     loadPriceChart().then(() => { apiStatus.fred = 'ok'; }).catch(() => { apiStatus.fred = 'err'; }),
     loadNews(),
+    loadGlobalIndicators(),
+    loadMarketStructure(),
   ]);
   calculateOSI();
   updateApiStatus();
