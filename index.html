@@ -664,16 +664,13 @@ async function loadProduction() {
   try {
     const data = await fetchEia('petroleum/crd/crpdn/data', {
       frequency: 'monthly', 'data[0]': 'value', 'facets[duoarea][]': 'NUS', 'facets[product][]': 'EPC0',
+      'facets[series][]': 'MCRFPUS2',
       'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 24,
     });
     const rows = data?.response?.data;
     if (!rows?.length) return;
     eiaData.prodData = rows;
-    const pts = rows.map(r => {
-      const [y, m] = r.period.split('-').map(Number);
-      const days = new Date(y, m, 0).getDate();
-      return { date: r.period + '-01', value: parseInt(r.value) / 1000 / days };
-    }).reverse();
+    const pts = rows.map(r => ({ date: r.period + '-01', value: parseInt(r.value) / 1000 })).reverse();
     const latest = pts[pts.length - 1];
     const yearAgo = pts.length > 12 ? pts[pts.length - 13] : pts[0];
     document.getElementById('prod-info').textContent = `${latest.value.toFixed(1)} mb/d | YoY: ${(latest.value - yearAgo.value >= 0 ? '+' : '')}${(latest.value - yearAgo.value).toFixed(1)}`;
