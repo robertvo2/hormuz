@@ -516,19 +516,19 @@ function updatePriceTiles() {
 // PRICE CHART
 // ==========================================
 async function loadPriceChart() {
-  const brentHist = await fetchYahooHistory('BZ=F', '1mo', '1d');
+  const brentHist = await fetchYahooHistory('BZ=F', '5d', '1h');
   await new Promise(r => setTimeout(r, 400));
-  const wtiHist = await fetchYahooHistory('CL=F', '1mo', '1d');
+  const wtiHist = await fetchYahooHistory('CL=F', '5d', '1h');
   if (brentHist && wtiHist && brentHist.length > 3) {
-    document.getElementById('chart-range-label').textContent = '(1 Month)';
+    document.getElementById('chart-range-label').textContent = '(1 Week)';
     renderPriceChart(brentHist, wtiHist);
     return;
   }
-  const startDate = new Date(); startDate.setDate(startDate.getDate() - 60);
+  const startDate = new Date(); startDate.setDate(startDate.getDate() - 10);
   const start = startDate.toISOString().split('T')[0];
   const [fredBrent, fredWti] = await Promise.all([fetchFred('DCOILBRENTEU', start), fetchFred('DCOILWTICO', start)]);
   if (fredBrent && fredWti) {
-    document.getElementById('chart-range-label').textContent = '(FRED — 60d)';
+    document.getElementById('chart-range-label').textContent = '(FRED — 7d)';
     renderPriceChart(fredBrent.map(d => ({ date: d.date, close: d.value })), fredWti.map(d => ({ date: d.date, close: d.value })));
   }
 }
@@ -549,7 +549,7 @@ function renderPriceChart(brent, wti) {
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 8, usePointStyle: true, font: { size: 8 } } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}` } } },
       scales: {
-        x: { type: 'time', time: { unit: 'week' }, grid: { display: false } },
+        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'MMM d, HH:mm' }, grid: { display: false } },
         y: { grid: { color: 'rgba(30,37,48,0.8)' }, ticks: { callback: v => '$'+v } }
       }
     }
@@ -669,7 +669,11 @@ async function loadProduction() {
     const rows = data?.response?.data;
     if (!rows?.length) return;
     eiaData.prodData = rows;
-    const pts = rows.map(r => ({ date: r.period + '-01', value: parseInt(r.value) / 1000 / 30 })).reverse();
+    const pts = rows.map(r => {
+      const [y, m] = r.period.split('-').map(Number);
+      const days = new Date(y, m, 0).getDate();
+      return { date: r.period + '-01', value: parseInt(r.value) / 1000 / days };
+    }).reverse();
     const latest = pts[pts.length - 1];
     const yearAgo = pts.length > 12 ? pts[pts.length - 13] : pts[0];
     document.getElementById('prod-info').textContent = `${latest.value.toFixed(1)} mb/d | YoY: ${(latest.value - yearAgo.value >= 0 ? '+' : '')}${(latest.value - yearAgo.value).toFixed(1)}`;
