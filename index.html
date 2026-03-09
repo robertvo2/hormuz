@@ -757,16 +757,14 @@ async function loadNews() {
 // ==========================================
 async function loadGlobalIndicators() {
   try {
-    // Stagger after loadPrices to avoid proxy rate-limiting on initial load
-    await new Promise(r => setTimeout(r, 2000));
     // Heating Oil futures
     const ho = await fetchYahoo('HO=F');
     if (ho) globalData.ho = ho;
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 300));
     // RBOB Gasoline futures
     const rb = await fetchYahoo('RB=F');
     if (rb) globalData.rb = rb;
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 300));
     // Dollar Index
     const dxy = await fetchYahoo('DX-Y.NYB');
     if (dxy) globalData.dxy = dxy;
@@ -806,8 +804,6 @@ function updateGlobalPanel() {
 
 async function loadMarketStructure() {
   try {
-    // Delay to stagger after other Yahoo calls
-    await new Promise(r => setTimeout(r, 4000));
     // Use Yahoo Finance 6-month Brent history (real-time, no API key needed)
     const brentHist = await fetchYahooHistory('BZ=F', '6mo', '1d');
     if (!brentHist || brentHist.length < 20) return;
@@ -942,14 +938,16 @@ async function refreshAll() {
   dot.className = 'status-dot';
   try { await loadPrices(); apiStatus.yahoo = latestPrices.brent ? 'ok' : 'err'; } catch(e) { apiStatus.yahoo = 'err'; }
   try { await loadEIA(); apiStatus.eia = eiaData.inventory.length > 0 ? 'ok' : 'err'; } catch(e) { apiStatus.eia = 'err'; }
+  // Phase 1: non-Yahoo-heavy calls in parallel
   await Promise.allSettled([
     loadSPR(),
     loadProduction(),
     loadPriceChart(),
     loadNews(),
-    loadGlobalIndicators(),
-    loadMarketStructure(),
   ]);
+  // Phase 2: Yahoo-heavy calls AFTER phase 1 to avoid proxy rate-limiting
+  try { await loadGlobalIndicators(); } catch(e) {}
+  try { await loadMarketStructure(); } catch(e) {}
   updateGlobalPanel();
   calculateOSI();
   updateApiStatus();
