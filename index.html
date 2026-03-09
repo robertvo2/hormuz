@@ -136,6 +136,19 @@
   .error-badge { font-family: var(--mono); font-size: 8px; color: var(--red); background: rgba(224,48,48,0.1); border: 1px solid rgba(224,48,48,0.2); padding: 1px 4px; border-radius: 2px; }
   .ok-badge { font-family: var(--mono); font-size: 8px; color: var(--green); background: rgba(32,192,96,0.1); border: 1px solid rgba(32,192,96,0.2); padding: 1px 4px; border-radius: 2px; }
 
+  /* INFO ICONS & POPUP */
+  .info-btn { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--dim); color: var(--muted); font-family: var(--mono); font-size: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s; flex-shrink: 0; line-height: 1; user-select: none; }
+  .info-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(232,160,32,0.1); }
+  .info-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; }
+  .info-overlay.active { display: flex; }
+  .info-popup { background: var(--panel); border: 1px solid var(--accent); border-radius: 4px; padding: 12px 16px; max-width: 420px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+  .info-popup h3 { font-family: var(--sans); font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
+  .info-popup p { font-family: var(--mono); font-size: 10px; color: var(--text); line-height: 1.6; margin-bottom: 8px; }
+  .info-popup p:last-child { margin-bottom: 0; }
+  .info-popup .info-term { color: var(--accent); font-weight: 600; }
+  .info-popup .info-close { font-family: var(--mono); font-size: 8px; color: var(--muted); cursor: pointer; float: right; border: 1px solid var(--dim); padding: 1px 6px; margin-left: 8px; }
+  .info-popup .info-close:hover { border-color: var(--accent); color: var(--accent); }
+
   @media (max-width: 1200px) {
     .main-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
     .g-price, .g-eia, .g-hormuz, .g-spr, .g-prod, .g-spread { grid-column: auto; grid-row: auto; }
@@ -225,7 +238,7 @@
   <div class="oversupply-header">
     <div>
       <div class="label">Oversupply Confidence Index</div>
-      <div class="sublabel">Composite: Inventory, price, crack spread, term structure, momentum, DXY, VIX</div>
+      <div class="sublabel">Composite: Inventory, price, crack spread, term structure, momentum, DXY, VIX <span class="info-btn" onclick="showInfo('osi')">i</span></div>
     </div>
     <div style="text-align:right;display:flex;align-items:center;gap:8px">
       <div class="sublabel" id="osi-label">Calculating...</div>
@@ -247,13 +260,13 @@
 
   <!-- Price Chart (col 1-2, row 1) -->
   <div class="panel chart-panel g-price">
-    <div class="panel-title">Brent &amp; WTI — Recent <span id="chart-range-label"></span></div>
+    <div class="panel-title">Brent &amp; WTI — Recent <span id="chart-range-label"></span> <span class="info-btn" onclick="showInfo('price')">i</span></div>
     <canvas id="priceChart"></canvas>
   </div>
 
   <!-- EIA Inventory (col 3, row 1) -->
   <div class="panel g-eia">
-    <div class="panel-title">EIA US Crude Stocks — Weekly</div>
+    <div class="panel-title">EIA US Crude Stocks — Weekly <span class="info-btn" onclick="showInfo('eia')">i</span></div>
     <div id="eia-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
       <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading EIA...</div>
     </div>
@@ -261,7 +274,7 @@
 
   <!-- Global Supply Signals (col 4, row 1) -->
   <div class="panel g-hormuz">
-    <div class="panel-title">Global Supply Signals</div>
+    <div class="panel-title">Global Supply Signals <span class="info-btn" onclick="showInfo('global')">i</span></div>
     <div class="hormuz-stat"><span class="hs-label">Term Structure</span><span class="hs-value" id="gs-term">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">Front vs 6M</span><span class="hs-value" id="gs-term-spread">—</span></div>
     <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
@@ -297,7 +310,7 @@
 
   <!-- News Feed (col 3, row 2) -->
   <div class="panel g-news">
-    <div class="panel-title">Energy News — Live RSS</div>
+    <div class="panel-title">Energy News — Live RSS <span class="info-btn" onclick="showInfo('news')">i</span></div>
     <div id="news-content" style="flex:1;overflow-y:auto;min-height:0">
       <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading news...</div>
     </div>
@@ -311,11 +324,11 @@
   <!-- Mini Charts: SPR + Production stacked (col 4, row 2) -->
   <div class="panel g-mini">
     <div class="mini-chart" style="background:var(--panel);padding:4px 6px">
-      <div class="panel-title">SPR <span id="spr-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span></div>
+      <div class="panel-title">SPR <span id="spr-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span> <span class="info-btn" onclick="showInfo('spr')">i</span></div>
       <canvas id="sprChart"></canvas>
     </div>
     <div class="mini-chart" style="background:var(--panel);padding:4px 6px">
-      <div class="panel-title">US Production <span id="prod-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span></div>
+      <div class="panel-title">US Production <span id="prod-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span> <span class="info-btn" onclick="showInfo('prod')">i</span></div>
       <canvas id="prodChart"></canvas>
     </div>
   </div>
@@ -1018,6 +1031,87 @@ window.addEventListener('load', () => {
   refreshAll();
   setInterval(refreshAll, 3 * 60 * 1000);
 });
+// ==========================================
+// INFO POPUP SYSTEM
+// ==========================================
+const infoContent = {
+  osi: {
+    title: 'Oversupply Confidence Index (OSI)',
+    text: `<p>De OSI is een gewogen gemiddelde van <span class="info-term">10 indicatoren</span> die samen inschatten hoe waarschijnlijk een olie-overaanbod is. Score 0–100.</p>
+<p><span class="info-term">0–30 = Tight Supply</span> (rood): krapte op de markt, prijsdruk omhoog.<br>
+<span class="info-term">30–45 = Leaning Tight</span><br>
+<span class="info-term">45–55 = Balanced</span>: evenwicht tussen vraag en aanbod.<br>
+<span class="info-term">55–70 = Leaning Oversupplied</span><br>
+<span class="info-term">70–100 = Oversupplied</span> (groen): teveel aanbod, prijsdruk omlaag.</p>
+<p><span class="info-term">Componenten & gewichten:</span><br>
+Inventaris-verandering (5) · Inventaris vs 5jr-gem (5) · Productietrend (5) · SPR-niveau (5) · Prijstrend (4) · Crack Spread (3) · Term Structure (3) · VIX (2) · DXY (2) · Price Momentum (2)</p>
+<p>Elke component wordt genormaliseerd naar −1 (tight) tot +1 (oversupplied), vermenigvuldigd met zijn gewicht, en gemiddeld tot een eindscore.</p>`
+  },
+  price: {
+    title: 'Brent & WTI Prijsgrafiek',
+    text: `<p>Toont de recente prijsbeweging van <span class="info-term">Brent Crude</span> (internationaal referentiepunt, Noordzee-olie) en <span class="info-term">WTI</span> (West Texas Intermediate, Amerikaans referentiepunt) op 15-minuten basis.</p>
+<p><span class="info-term">Brent</span> is relevanter voor de Hormuz-context: ~20% van de wereldwijde oliehandel gaat door de Straat van Hormuz, en dit is overwegend Brent-geprijsde olie uit de Golfregio.</p>
+<p><span class="info-term">WTI</span> is het Amerikaanse referentiepunt. Het verschil (spread) geeft informatie over regionale vraag/aanbod-verschillen.</p>
+<p>Bron: Yahoo Finance (real-time met vertraging van ~15 min).</p>`
+  },
+  eia: {
+    title: 'EIA Crude Oil Inventaris',
+    text: `<p>Wekelijkse ruwe olievoorraden in de VS, gerapporteerd door de <span class="info-term">Energy Information Administration</span> (EIA, onderdeel van het US Dept. of Energy).</p>
+<p><span class="info-term">Balken</span> tonen de actuele voorraad per categorie (Cushing, SPR, etc.) vergeleken met het 5-jaar gemiddelde. Langer = hoger dan gemiddeld = meer voorraad.</p>
+<p><span class="info-term">Weekverandering</span>: een stijging (build) wijst op minder vraag of meer aanbod — bearish voor prijzen. Een daling (draw) wijst op meer vraag of minder aanbod — bullish.</p>
+<p>De VS is de grootste olieconsument ter wereld, dus deze data is een belangrijke barometer voor de globale markt, maar het is slechts één land.</p>`
+  },
+  global: {
+    title: 'Global Supply Signals',
+    text: `<p>Vier marktindicatoren die samen een beeld geven van de wereldwijde oliemarkt:</p>
+<p><span class="info-term">Term Structure</span> (front vs 6 maanden forward): vergelijkt de prijs van Brent nú met het futures-contract over 6 maanden.<br>
+• <span class="info-term">Backwardation</span> (front > 6M): markt is nu krap, kopers betalen premie voor directe levering.<br>
+• <span class="info-term">Contango</span> (front < 6M): er is genoeg aanbod, toekomstige prijs is hoger door opslagkosten.</p>
+<p><span class="info-term">Price Momentum</span>: huidige Brent-prijs vs het 3-maands voortschrijdend gemiddelde. Toont of de trend stijgend of dalend is, en hoe sterk.</p>
+<p><span class="info-term">Gasoline Crack Spread</span>: (benzineprijs × 42) − Brent. Meet de raffinagmarge. Hoge crack = sterke vraag naar geraffineerde producten. Lage crack = zwakke vraag.</p>
+<p><span class="info-term">Dollar Index (DXY)</span>: olie wordt in dollars verhandeld. Sterke dollar (DXY >104) maakt olie duurder voor niet-dollar-landen → minder vraag → bearish.</p>`
+  },
+  news: {
+    title: 'Energy News Feed',
+    text: `<p>Live nieuwsfeed via RSS van diverse energiebronnen. Headlines worden automatisch opgehaald en ververst bij elke update-cyclus (3 min).</p>
+<p>Klik op een headline om het volledige artikel te openen. De <span class="info-term">quick links</span> onderaan bieden directe toegang tot de belangrijkste energie-nieuwsbronnen.</p>
+<p>Tip: nieuws over Hormuz, OPEC-besluiten, sancties, en geopolitieke spanningen heeft directe impact op de oliemarkt en de OSI-score.</p>`
+  },
+  spr: {
+    title: 'Strategic Petroleum Reserve (SPR)',
+    text: `<p>De <span class="info-term">Strategic Petroleum Reserve</span> is de noodvoorraad ruwe olie van de VS, opgeslagen in zoutkoepels langs de Golf van Mexico.</p>
+<p>Historisch maximum: ~727 miljoen vaten. Na massale vrijgave in 2022 (voor prijsstabilisatie) sterk gedaald. De overheid vult langzaam bij.</p>
+<p><span class="info-term">Laag SPR-niveau</span> = minder buffer tegen supply-schokken (zoals een Hormuz-blokkade) → tight signal voor de OSI.<br>
+<span class="info-term">Hoog SPR-niveau</span> = meer buffer, minder kwetsbaar → oversupply signal.</p>
+<p>Bron: EIA Weekly Petroleum Status Report.</p>`
+  },
+  prod: {
+    title: 'US Crude Oil Productie',
+    text: `<p>Wekelijkse ruwe olieproductie van de VS in miljoenen vaten per dag (Mb/d). De VS is momenteel de <span class="info-term">grootste olieproducent</span> ter wereld (~13.5 Mb/d).</p>
+<p><span class="info-term">Stijgende productie</span> = meer aanbod op de wereldmarkt → oversupply signal.<br>
+<span class="info-term">Dalende productie</span> = minder aanbod → tight supply signal.</p>
+<p>De grafiek toont de trend over de afgelopen maanden. Let op: dit is alleen US-productie. OPEC+ productie (Saudi-Arabië, Rusland, etc.) is minstens zo belangrijk maar niet real-time beschikbaar.</p>
+<p>Bron: EIA Weekly Petroleum Status Report.</p>`
+  }
+};
+
+function showInfo(key) {
+  const info = infoContent[key];
+  if (!info) return;
+  const overlay = document.getElementById('info-overlay');
+  const popup = document.getElementById('info-popup-content');
+  popup.innerHTML = `<span class="info-close" onclick="hideInfo()">✕ SLUITEN</span><h3>${info.title}</h3>${info.text}`;
+  overlay.classList.add('active');
+}
+function hideInfo() {
+  document.getElementById('info-overlay').classList.remove('active');
+}
 </script>
+
+<!-- Info Popup Overlay -->
+<div class="info-overlay" id="info-overlay" onclick="if(event.target===this)hideInfo()">
+  <div class="info-popup" id="info-popup-content"></div>
+</div>
+
 </body>
 </html>
