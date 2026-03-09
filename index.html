@@ -814,6 +814,8 @@ function updateGlobalPanel() {
 
 async function loadMarketStructure() {
   try {
+    // Delay to avoid FRED rate-limiting (loadPriceChart also uses FRED as fallback)
+    await new Promise(r => setTimeout(r, 2000));
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 6);
     const start = startDate.toISOString().split('T')[0];
