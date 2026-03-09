@@ -6,7 +6,7 @@
 <title>HORMUZ // OVERSUPPLY MONITOR</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-date-fns/3.0.0/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
   :root {
     --bg: #0a0c0f; --panel: #0f1318; --border: #1e2530; --accent: #e8a020;
@@ -694,25 +694,37 @@ async function loadNews() {
   const feeds = [
     { url: 'https://oilprice.com/rss/main', name: 'OilPrice' },
     { url: 'https://www.eia.gov/rss/todayinenergy.xml', name: 'EIA' },
-    { url: 'https://news.google.com/rss/search?q=oil+crude+hormuz&hl=en-US&gl=US&ceid=US:en', name: 'Google' },
+    { url: 'https://news.google.com/rss/search?q=oil+crude+hormuz+strait&hl=en-US&gl=US&ceid=US:en', name: 'Google' },
   ];
-  let allItems = [];
-  for (const feed of feeds) {
+  async function fetchRSS(feedUrl) {
+    // Try rss2json first
     try {
-      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=8`;
-      const r = await fetch(apiUrl);
-      if (!r.ok) continue;
-      const data = await r.json();
-      if (data.items) {
-        allItems.push(...data.items.map(it => ({
-          title: it.title,
-          link: it.link,
-          src: feed.name,
-          date: new Date(it.pubDate),
-        })));
+      const r = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&count=8`);
+      if (r.ok) { const d = await r.json(); if (d.items && d.items.length > 0) return d.items; }
+    } catch(e) {}
+    // Fallback: allorigins proxy + manual XML parse
+    try {
+      const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`);
+      if (r.ok) {
+        const xml = await r.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(xml, 'text/xml');
+        const items = [...doc.querySelectorAll('item')].slice(0, 8).map(item => ({
+          title: item.querySelector('title')?.textContent || '',
+          link: item.querySelector('link')?.textContent || '',
+          pubDate: item.querySelector('pubDate')?.textContent || '',
+        }));
+        if (items.length > 0) return items;
       }
-    } catch(e) { continue; }
+    } catch(e) {}
+    return [];
   }
+  let allItems = [];
+  const results = await Promise.allSettled(feeds.map(async feed => {
+    const items = await fetchRSS(feed.url);
+    return items.map(it => ({ title: it.title, link: it.link, src: feed.name, date: new Date(it.pubDate) }));
+  }));
+  for (const r of results) { if (r.status === 'fulfilled') allItems.push(...r.value); }
   allItems.sort((a, b) => b.date - a.date);
   const el = document.getElementById('news-content');
   if (allItems.length === 0) {
