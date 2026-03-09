@@ -225,7 +225,7 @@
   <div class="oversupply-header">
     <div>
       <div class="label">Oversupply Confidence Index</div>
-      <div class="sublabel">Composite: Inventory, price, crack spread, market structure, DXY, VIX</div>
+      <div class="sublabel">Composite: Inventory, price, crack spread, term structure, momentum, DXY, VIX</div>
     </div>
     <div style="text-align:right;display:flex;align-items:center;gap:8px">
       <div class="sublabel" id="osi-label">Calculating...</div>
@@ -262,7 +262,10 @@
   <!-- Global Supply Signals (col 4, row 1) -->
   <div class="panel g-hormuz">
     <div class="panel-title">Global Supply Signals</div>
-    <div class="hormuz-stat"><span class="hs-label">Market Structure</span><span class="hs-value" id="gs-structure">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Term Structure</span><span class="hs-value" id="gs-term">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Front vs 6M</span><span class="hs-value" id="gs-term-spread">—</span></div>
+    <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
+    <div class="hormuz-stat"><span class="hs-label">Price Momentum</span><span class="hs-value" id="gs-structure">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">Spot vs 3M Avg</span><span class="hs-value" id="gs-momentum">—</span></div>
     <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
     <div class="hormuz-stat"><span class="hs-label">Gasoline Crack</span><span class="hs-value" id="gs-crack">—</span></div>
@@ -271,9 +274,9 @@
     <div class="hormuz-stat"><span class="hs-label">Dollar (DXY)</span><span class="hs-value" id="gs-dxy">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">DXY Signal</span><span class="hs-value" id="gs-dxy-signal">—</span></div>
     <div style="font-family:var(--mono);font-size:7px;color:var(--dim);margin-top:4px;line-height:1.4">
-      Structure: spot vs 3M avg (Yahoo daily)<br>
-      Crack: (RB×42)−Brent. &gt;$25 strong demand<br>
-      DXY &gt;104 = strong $ = bearish oil
+      Term: front-month vs 6M forward Brent<br>
+      Momentum: spot vs 3M avg<br>
+      Crack: (RB×42)−Brent. DXY &gt;104 = bearish
     </div>
     <div class="quick-links" style="margin-top:auto">
       <a href="https://www.reuters.com/business/energy/" target="_blank">Reuters</a>
@@ -320,7 +323,7 @@
 </div>
 
 <footer>
-  <span>Data: Yahoo Finance (prices, DXY, crack, market structure) · EIA.gov · MarineTraffic — Auto-refresh: 3 min</span>
+  <span>Data: Yahoo Finance (prices, DXY, crack, term structure, momentum) · EIA.gov · MarineTraffic — Auto-refresh: 3 min</span>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
   </div>
@@ -421,7 +424,7 @@ async function fetchEia(route, params = {}) {
 // PRICE LOADING
 // ==========================================
 let latestPrices = {};
-let globalData = { ho: null, rb: null, dxy: null, marketStructure: null };
+let globalData = { ho: null, rb: null, dxy: null, priceMomentum: null, termStructure: null };
 
 async function loadPrices() {
   const symbols = [
@@ -802,28 +805,75 @@ function updateGlobalPanel() {
   }
 }
 
-async function loadMarketStructure() {
+async function loadPriceMomentum() {
   try {
-    // Use Yahoo Finance 6-month Brent history (real-time, no API key needed)
+    // Yahoo Finance 6-month Brent daily history — spot vs rolling average
     const brentHist = await fetchYahooHistory('BZ=F', '6mo', '1d');
     if (!brentHist || brentHist.length < 20) return;
     const latest = brentHist[brentHist.length - 1].close;
-    // 3-month rolling average (~63 trading days)
-    const win = Math.min(63, brentHist.length);
+    const win = Math.min(63, brentHist.length); // ~3 months of trading days
     const avg3m = brentHist.slice(-win).reduce((s, d) => s + d.close, 0) / win;
     const deviation = ((latest - avg3m) / avg3m * 100);
-    globalData.marketStructure = { spot: latest, avg3m, deviation };
+    globalData.priceMomentum = { spot: latest, avg3m, deviation };
     const el = document.getElementById('gs-structure');
-    if (deviation > 5) { el.textContent = 'BACKWARDATION'; el.style.color = 'var(--red)'; }
-    else if (deviation > 1) { el.textContent = 'MILD BACKWARDATION'; el.style.color = 'var(--accent)'; }
+    if (deviation > 15) { el.textContent = 'SURGING'; el.style.color = 'var(--red)'; }
+    else if (deviation > 5) { el.textContent = 'STRONG UPTREND'; el.style.color = 'var(--red)'; }
+    else if (deviation > 1) { el.textContent = 'MILD UPTREND'; el.style.color = 'var(--accent)'; }
     else if (deviation > -1) { el.textContent = 'FLAT'; el.style.color = 'var(--text)'; }
-    else if (deviation > -5) { el.textContent = 'MILD CONTANGO'; el.style.color = 'var(--accent)'; }
-    else { el.textContent = 'CONTANGO'; el.style.color = 'var(--green)'; }
+    else if (deviation > -5) { el.textContent = 'MILD DOWNTREND'; el.style.color = 'var(--accent)'; }
+    else { el.textContent = 'FALLING'; el.style.color = 'var(--green)'; }
     const momEl = document.getElementById('gs-momentum');
     momEl.textContent = (deviation >= 0 ? '+' : '') + deviation.toFixed(1) + '% ($' + latest.toFixed(2) + ' vs $' + avg3m.toFixed(2) + ')';
     momEl.style.color = deviation > 2 ? 'var(--red)' : deviation < -2 ? 'var(--green)' : 'var(--accent)';
-    apiStatus.mkt = 'ok'; // reuse fred status slot for market structure
-  } catch(e) { console.warn('Market structure error:', e); apiStatus.mkt = 'err'; }
+  } catch(e) { console.warn('Price momentum error:', e); }
+}
+
+async function loadTermStructure() {
+  try {
+    // Derive front-month and 6-month-out Brent contract symbols dynamically
+    const monthCodes = ['F','G','H','J','K','M','N','Q','U','V','X','Z'];
+    const now = new Date();
+    // Front month = current month + 1 (or +2 if past 20th = near expiry)
+    let fm = now.getMonth() + (now.getDate() > 20 ? 2 : 1);
+    let fmYear = now.getFullYear();
+    if (fm > 11) { fm -= 12; fmYear++; }
+    // 6-month-out contract
+    let sm = fm + 6;
+    let smYear = fmYear;
+    if (sm > 11) { sm -= 12; smYear++; }
+    const frontSym = 'BZ' + monthCodes[fm] + String(fmYear).slice(-2) + '.NYM';
+    const farSym = 'BZ' + monthCodes[sm] + String(smYear).slice(-2) + '.NYM';
+    // Fetch both contract prices
+    await new Promise(r => setTimeout(r, 300));
+    const front = await fetchYahoo(frontSym);
+    await new Promise(r => setTimeout(r, 300));
+    const far = await fetchYahoo(farSym);
+    if (!front || !far) {
+      // Fallback: use front-month (BZ=F) and estimate from 6mo history
+      const bz = await fetchYahoo('BZ=F');
+      if (!bz) return;
+      const hist = await fetchYahooHistory('BZ=F', '6mo', '1d');
+      if (!hist || hist.length < 20) return;
+      // Use 1-month-ago price as proxy for far contract pricing
+      const farProxy = hist[Math.max(0, hist.length - 22)].close;
+      globalData.termStructure = { front: bz.price, far: farProxy, spread: bz.price - farProxy, pct: ((bz.price - farProxy) / farProxy * 100), sym: 'BZ=F vs ~1M ago', fallback: true };
+    } else {
+      const spread = front.price - far.price;
+      const pct = (spread / far.price * 100);
+      globalData.termStructure = { front: front.price, far: far.price, spread, pct, sym: frontSym + ' vs ' + farSym, fallback: false };
+    }
+    const ts = globalData.termStructure;
+    const el = document.getElementById('gs-term');
+    if (ts.spread > 3) { el.textContent = 'BACKWARDATION'; el.style.color = 'var(--red)'; }
+    else if (ts.spread > 0.5) { el.textContent = 'MILD BACKWARDATION'; el.style.color = 'var(--accent)'; }
+    else if (ts.spread > -0.5) { el.textContent = 'FLAT'; el.style.color = 'var(--text)'; }
+    else if (ts.spread > -3) { el.textContent = 'MILD CONTANGO'; el.style.color = 'var(--accent)'; }
+    else { el.textContent = 'CONTANGO'; el.style.color = 'var(--green)'; }
+    const spEl = document.getElementById('gs-term-spread');
+    spEl.textContent = (ts.spread >= 0 ? '+' : '') + '$' + ts.spread.toFixed(2) + ' (' + (ts.pct >= 0 ? '+' : '') + ts.pct.toFixed(1) + '%)';
+    spEl.style.color = ts.spread > 1 ? 'var(--red)' : ts.spread < -1 ? 'var(--green)' : 'var(--accent)';
+    apiStatus.mkt = 'ok';
+  } catch(e) { console.warn('Term structure error:', e); apiStatus.mkt = 'err'; }
 }
 
 // ==========================================
@@ -834,7 +884,7 @@ function calculateOSI() {
   // Missing data sources are excluded (not counted as 0), preventing bias
   // Positive = oversupply signal, Negative = tight supply signal
   const components = [];
-  const maxSources = 9;
+  const maxSources = 10;
 
   // 1. US Inventory level vs 5yr avg (weight 2 — US proxy for global stocks)
   if (eiaData.inventory.length > 0) {
@@ -856,11 +906,16 @@ function calculateOSI() {
     else if (brent > 100) s = -1; else if (brent > 90) s = -0.6; else if (brent > 80) s = -0.25;
     components.push({ v: s, w: 3 });
   }
-  // 4. Market Structure — spot vs 3M avg (weight 3 — direct oversupply measure)
-  if (globalData.marketStructure) {
-    const dev = globalData.marketStructure.deviation;
-    // Positive deviation = backwardation = tight, Negative = contango = oversupply
-    components.push({ v: Math.max(-1, Math.min(1, -dev / 10)), w: 3 });
+  // 4. Term Structure — futures curve (weight 3 — direct oversupply measure)
+  if (globalData.termStructure) {
+    const spread = globalData.termStructure.spread;
+    // Positive spread = backwardation = tight, Negative = contango = oversupply
+    components.push({ v: Math.max(-1, Math.min(1, -spread / 5)), w: 3 });
+  }
+  // 4b. Price Momentum — spot vs 3M avg (weight 2)
+  if (globalData.priceMomentum) {
+    const dev = globalData.priceMomentum.deviation;
+    components.push({ v: Math.max(-1, Math.min(1, -dev / 15)), w: 2 });
   }
   // 5. Crack Spread — refinery demand (weight 2.5 — global demand signal)
   if (globalData.crack !== undefined) {
@@ -947,7 +1002,8 @@ async function refreshAll() {
   ]);
   // Phase 2: Yahoo-heavy calls AFTER phase 1 to avoid proxy rate-limiting
   try { await loadGlobalIndicators(); } catch(e) {}
-  try { await loadMarketStructure(); } catch(e) {}
+  try { await loadPriceMomentum(); } catch(e) {}
+  try { await loadTermStructure(); } catch(e) {}
   updateGlobalPanel();
   calculateOSI();
   updateApiStatus();
