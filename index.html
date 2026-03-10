@@ -344,9 +344,11 @@
       <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading EIA...</div>
     </div>
     <div style="border-top:1px solid var(--dim);margin-top:4px;padding-top:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">Cushing OK Hub</span><span class="info-btn" onclick="showInfo('cushing')">i</span></div>
       <div id="cushing-content" style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading Cushing...</div>
     </div>
     <div style="border-top:1px solid var(--dim);margin-top:4px;padding-top:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">US Net Imports</span><span class="info-btn" onclick="showInfo('netimports')">i</span></div>
       <div id="netimport-content" style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading Net Imports...</div>
     </div>
   </div>
@@ -1329,6 +1331,25 @@ Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory v
 <p><span class="info-term">Rising production</span> = more supply on the global market → oversupply signal.<br>
 <span class="info-term">Falling production</span> = less supply → tight supply signal.</p>
 <p>The chart shows the trend over recent months. Note: this covers US production only. OPEC+ output (Saudi Arabia, Russia, etc.) is equally important but not available in real-time.</p>
+<p>Source: EIA Weekly Petroleum Status Report.</p>`
+  },
+  cushing: {
+    title: 'Cushing, Oklahoma — WTI Delivery Hub',
+    text: `<p><span class="info-term">Cushing, OK</span> is the physical delivery point for WTI futures contracts and the most important crude oil storage hub in the US. Total shell capacity is approximately <span class="info-term">76 million barrels</span>.</p>
+<p><span class="info-term">Below 25 MB</span>: operationally tight — pipelines and refineries struggle to access oil, WTI prices spike upward.<br>
+<span class="info-term">25–35 MB</span>: moderate levels, functioning normally.<br>
+<span class="info-term">Above 45 MB</span>: well-supplied, signals potential oversupply in the US midcontinent.</p>
+<p>Cushing levels are a key leading indicator for WTI price direction and are closely watched by oil traders worldwide.</p>
+<p><span class="info-term">OSI weight: 1.5</span> — low Cushing = tight signal, high Cushing = oversupply signal.</p>
+<p>Source: EIA Weekly Petroleum Status Report.</p>`
+  },
+  netimports: {
+    title: 'US Net Crude Oil Imports',
+    text: `<p><span class="info-term">Net imports</span> = total US crude oil imports minus total US crude oil exports. Measured in million barrels per day (mb/d).</p>
+<p>The US was historically a major net importer, but the shale revolution turned it into a significant exporter. Today net imports fluctuate around <span class="info-term">2–3 mb/d</span>.</p>
+<p><span class="info-term">Rising net imports</span>: the US needs more foreign oil → domestic supply is tight, bullish for prices.<br>
+<span class="info-term">Falling net imports</span>: the US is more self-sufficient → domestic surplus, bearish for prices, and more US crude available for global markets.</p>
+<p><span class="info-term">OSI weight: 1.0</span> — the 4-week trend is tracked. Rising = tight signal, falling = oversupply signal.</p>
 <p>Source: EIA Weekly Petroleum Status Report.</p>`
   }
 };
