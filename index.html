@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HORMUZ // OVERSUPPLY MONITOR</title>
+<title>HORMUZ // SUPPLY MONITOR</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -234,7 +234,7 @@
 <header>
   <div class="header-left">
     <div class="status-dot" id="statusDot"></div>
-    <h1>HORMUZ <span>//</span> OVERSUPPLY MONITOR</h1>
+    <h1>HORMUZ <span>//</span> SUPPLY MONITOR</h1>
   </div>
   <div class="header-meta">
     <div id="api-status"></div>
@@ -306,12 +306,12 @@
   </div>
 </div>
 
-<!-- OVERSUPPLY METER -->
+<!-- SUPPLY CONFIDENCE INDEX -->
 <div class="oversupply-row">
   <div class="oversupply-header">
     <div>
-      <div class="label">Oversupply Confidence Index</div>
-      <div class="sublabel">Composite: Inventory, price, crack spread, term structure, momentum, DXY, VIX <span class="info-btn" onclick="showInfo('osi')">i</span></div>
+      <div class="label">Supply Confidence Index</div>
+      <div class="sublabel">15 indicators: global balance, OPEC, non-OECD demand, inventories, prices, structure, macro <span class="info-btn" onclick="showInfo('osi')">i</span></div>
     </div>
     <div style="text-align:right;display:flex;align-items:center;gap:8px">
       <div class="sublabel" id="osi-label">Calculating...</div>
@@ -322,9 +322,9 @@
     <div class="meter-marker" id="osi-marker" style="left:50%"></div>
   </div>
   <div class="meter-labels">
-    <span>◀ TIGHT SUPPLY</span>
+    <span>◀ TIGHT</span>
     <span>BALANCED</span>
-    <span>OVERSUPPLIED ▶</span>
+    <span>SURPLUS ▶</span>
   </div>
 </div>
 
@@ -367,10 +367,15 @@
     <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
     <div class="hormuz-stat"><span class="hs-label">Dollar (DXY)</span><span class="hs-value" id="gs-dxy">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">DXY Signal</span><span class="hs-value" id="gs-dxy-signal">—</span></div>
+    <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
+    <div class="hormuz-stat"><span class="hs-label">World Balance</span><span class="hs-value" id="gs-worldbal">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">OPEC Supply</span><span class="hs-value" id="gs-opec">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Non-OECD Demand</span><span class="hs-value" id="gs-nonoecd">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Global Signal</span><span class="hs-value" id="gs-global-signal">—</span></div>
     <div style="font-family:var(--mono);font-size:7px;color:var(--dim);margin-top:4px;line-height:1.4">
       Term: front-month vs 6M forward Brent<br>
-      Momentum: spot vs 3M avg<br>
-      Crack: (RB×42)−Brent. DXY &gt;104 = bearish
+      Crack: (RB×42)−Brent. DXY &gt;104 = bearish<br>
+      Balance: world prod − consumption (STEO)
     </div>
     <div class="quick-links" style="margin-top:auto">
       <a href="https://www.reuters.com/business/energy/" target="_blank">Reuters</a>
@@ -417,7 +422,7 @@
 </div>
 
 <footer>
-  <span>Data: Yahoo Finance (prices, DXY, crack, term structure, momentum) · EIA.gov (stocks, Cushing, imports, exports, SPR, production) · MarineTraffic — Auto-refresh: 3 min</span>
+  <span>Data: Yahoo Finance (prices, DXY, crack, term structure, momentum) · EIA.gov (stocks, Cushing, imports, exports, SPR, production) · EIA STEO (world balance, OPEC, non-OECD) · MarineTraffic — Auto-refresh: 3 min</span>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
   </div>
@@ -850,6 +855,95 @@ async function loadNetImports() {
 }
 
 // ==========================================
+// GLOBAL: WORLD BALANCE, OPEC, NON-OECD (STEO)
+// ==========================================
+let steoData = { worldProd: [], worldCons: [], opec: [], nonOecd: [] };
+
+async function loadSTEO() {
+  try {
+    // Fetch world production, consumption, OPEC supply, and Non-OECD demand
+    // Use end parameter to exclude future forecasts (only actuals + near-term)
+    const now = new Date();
+    const endStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const [prodData, consData, opecData, nonOecdData] = await Promise.all([
+      fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PAPR_WORLD', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
+      fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PATC_WORLD', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
+      fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PAPR_OPEC', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
+      fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PATC_NON_OECD', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
+    ]);
+    const pRows = prodData?.response?.data;
+    const cRows = consData?.response?.data;
+    const oRows = opecData?.response?.data;
+    const nRows = nonOecdData?.response?.data;
+
+    // World Supply/Demand Balance
+    if (pRows?.length && cRows?.length) {
+      steoData.worldProd = pRows;
+      steoData.worldCons = cRows;
+      const prod = parseFloat(pRows[0].value);
+      const cons = parseFloat(cRows[0].value);
+      const balance = prod - cons; // positive = surplus, negative = deficit
+      const prevProd = parseFloat(pRows[1].value);
+      const prevCons = parseFloat(cRows[1].value);
+      const prevBal = prevProd - prevCons;
+      const trend = balance - prevBal;
+      const balColor = balance > 1.5 ? 'var(--green)' : balance > 0 ? 'var(--accent)' : balance > -1 ? 'var(--red)' : 'var(--red)';
+      const el = document.getElementById('gs-worldbal');
+      el.textContent = (balance >= 0 ? '+' : '') + balance.toFixed(1) + ' mb/d ' + (trend > 0 ? '▲' : trend < 0 ? '▼' : '▬');
+      el.style.color = balColor;
+      el.title = `Prod: ${prod.toFixed(1)} − Cons: ${cons.toFixed(1)} = ${balance >= 0 ? '+' : ''}${balance.toFixed(1)} mb/d (${pRows[0].period})`;
+    }
+
+    // OPEC Production
+    if (oRows?.length >= 2) {
+      steoData.opec = oRows;
+      const latest = parseFloat(oRows[0].value);
+      const prev = parseFloat(oRows[1].value);
+      const change = latest - prev;
+      const chgColor = change > 0 ? 'var(--green)' : change < 0 ? 'var(--red)' : 'var(--muted)';
+      const el = document.getElementById('gs-opec');
+      el.textContent = latest.toFixed(1) + ' mb/d (' + (change >= 0 ? '+' : '') + change.toFixed(2) + ')';
+      el.style.color = chgColor;
+      el.title = `OPEC total petroleum supply (${oRows[0].period})`;
+    }
+
+    // Non-OECD Demand (Asia proxy)
+    if (nRows?.length >= 2) {
+      steoData.nonOecd = nRows;
+      const latest = parseFloat(nRows[0].value);
+      const prev = parseFloat(nRows[1].value);
+      const change = latest - prev;
+      // YoY if we have 12+ months
+      let yoy = null;
+      if (nRows.length >= 13) {
+        yoy = latest - parseFloat(nRows[12].value);
+      }
+      const chgColor = change > 0 ? 'var(--red)' : 'var(--green)'; // rising demand = tight
+      const el = document.getElementById('gs-nonoecd');
+      let txt = latest.toFixed(1) + ' mb/d';
+      if (yoy !== null) txt += ' (YoY: ' + (yoy >= 0 ? '+' : '') + yoy.toFixed(1) + ')';
+      el.textContent = txt;
+      el.style.color = chgColor;
+      el.title = `Non-OECD liquid fuels consumption — proxy for Asia/EM demand (${nRows[0].period})`;
+    }
+
+    // Combined global signal
+    if (pRows?.length && cRows?.length) {
+      const balance = parseFloat(pRows[0].value) - parseFloat(cRows[0].value);
+      const sigEl = document.getElementById('gs-global-signal');
+      if (balance > 2) { sigEl.textContent = 'HEAVY SURPLUS'; sigEl.style.color = 'var(--green)'; }
+      else if (balance > 0.5) { sigEl.textContent = 'MILD SURPLUS'; sigEl.style.color = 'var(--accent)'; }
+      else if (balance > -0.5) { sigEl.textContent = 'BALANCED'; sigEl.style.color = 'var(--text)'; }
+      else if (balance > -1.5) { sigEl.textContent = 'MILD DEFICIT'; sigEl.style.color = 'var(--accent)'; }
+      else { sigEl.textContent = 'SUPPLY DEFICIT'; sigEl.style.color = 'var(--red)'; }
+    }
+
+  } catch(e) {
+    console.warn('STEO global data error:', e);
+  }
+}
+
+// ==========================================
 // SPR DATA
 // ==========================================
 async function loadSPR() {
@@ -1094,110 +1188,136 @@ async function loadTermStructure() {
 }
 
 // ==========================================
-// OVERSUPPLY INDEX
+// SUPPLY CONFIDENCE INDEX (SCI)
 // ==========================================
-function calculateOSI() {
+function calculateSCI() {
   // Weighted-average approach: each component normalized to -1..1, weighted by importance
   // Missing data sources are excluded (not counted as 0), preventing bias
-  // Positive = oversupply signal, Negative = tight supply signal
+  // Positive = surplus signal, Negative = tight supply signal
+  //
+  // WEIGHT PHILOSOPHY: Global fundamentals > Market structure > US data > Macro
+  // Total possible weight: ~28 (global ~12, market ~8.5, US ~5.5, macro ~2)
   const components = [];
-  const maxSources = 11;
+  const maxSources = 15;
 
-  // 1. US Inventory level vs 5yr avg (weight 2 — US proxy for global stocks)
-  if (eiaData.inventory.length > 0) {
-    const current = parseInt(eiaData.inventory[0].value) / 1000;
-    const avg5yr = (eiaData.fiveYrAvg || 430000) / 1000;
-    const diff = current - avg5yr;
-    components.push({ v: Math.max(-1, Math.min(1, diff / 50)), w: 2 });
+  // ── GLOBAL FUNDAMENTALS (highest weight ~12) ──
+
+  // 1. World Supply/Demand Balance (weight 4 — THE core measure)
+  if (steoData.worldProd.length > 0 && steoData.worldCons.length > 0) {
+    const balance = parseFloat(steoData.worldProd[0].value) - parseFloat(steoData.worldCons[0].value);
+    // Positive = surplus, negative = deficit. Typical range: -2 to +3 mb/d
+    components.push({ v: Math.max(-1, Math.min(1, balance / 2.5)), w: 4 });
   }
-  // 2. Inventory trend — 5-week direction (weight 1.5)
-  if (eiaData.inventory.length >= 5) {
-    const recent = eiaData.inventory.slice(0, 5).map(r => parseInt(r.value));
-    const trend = (recent[0] - recent[4]) / 1000;
-    components.push({ v: Math.max(-1, Math.min(1, trend / 10)), w: 1.5 });
+  // 2. OPEC Production trend (weight 3 — the supply tap for Hormuz region)
+  if (steoData.opec.length >= 3) {
+    const latest = parseFloat(steoData.opec[0].value);
+    const threeAgo = parseFloat(steoData.opec[2].value);
+    const change = latest - threeAgo; // 3-month trend in mb/d
+    // Rising OPEC = more supply = surplus; falling = cuts = tight
+    components.push({ v: Math.max(-1, Math.min(1, change / 1.5)), w: 3 });
   }
-  // 3. Brent price level (weight 3 — global benchmark)
+  // 3. Non-OECD Demand growth (weight 2.5 — Asia/EM demand, where Hormuz oil goes)
+  if (steoData.nonOecd.length >= 13) {
+    const latest = parseFloat(steoData.nonOecd[0].value);
+    const yearAgo = parseFloat(steoData.nonOecd[12].value);
+    const yoyGrowth = latest - yearAgo; // YoY change in mb/d
+    // Rising EM demand = tighter → negative; Falling = weaker pull → positive
+    components.push({ v: Math.max(-1, Math.min(1, -yoyGrowth / 2)), w: 2.5 });
+  }
+  // 4. Brent price level (weight 2.5 — global benchmark, reflects overall balance)
   const brent = latestPrices.brent?.price;
   if (brent) {
     let s = 0;
     if (brent < 60) s = 0.75; else if (brent < 70) s = 0.4; else if (brent < 75) s = 0.15;
     else if (brent > 100) s = -1; else if (brent > 90) s = -0.6; else if (brent > 80) s = -0.25;
-    components.push({ v: s, w: 3 });
-  }
-  // 4. Term Structure — futures curve (weight 3 — direct oversupply measure)
-  if (globalData.termStructure) {
-    const spread = globalData.termStructure.spread;
-    // Positive spread = backwardation = tight, Negative = contango = oversupply
-    components.push({ v: Math.max(-1, Math.min(1, -spread / 5)), w: 3 });
-  }
-  // 4b. Price Momentum — spot vs 3M avg (weight 2)
-  if (globalData.priceMomentum) {
-    const dev = globalData.priceMomentum.deviation;
-    components.push({ v: Math.max(-1, Math.min(1, -dev / 15)), w: 2 });
-  }
-  // 5. Crack Spread — refinery demand (weight 2.5 — global demand signal)
-  if (globalData.crack !== undefined) {
-    let s = 0;
-    if (globalData.crack > 30) s = -0.8; // very strong demand = tight
-    else if (globalData.crack > 20) s = -0.3;
-    else if (globalData.crack < 5) s = 0.8; // weak demand = oversupply
-    else if (globalData.crack < 10) s = 0.4;
     components.push({ v: s, w: 2.5 });
   }
-  // 6. DXY — dollar strength (weight 2 — global purchasing power)
+
+  // ── MARKET STRUCTURE (weight ~8.5) ──
+
+  // 5. Term Structure — futures curve (weight 3 — direct market view on supply)
+  if (globalData.termStructure) {
+    const spread = globalData.termStructure.spread;
+    // Positive spread = backwardation = tight, Negative = contango = surplus
+    components.push({ v: Math.max(-1, Math.min(1, -spread / 5)), w: 3 });
+  }
+  // 6. Crack Spread — refinery demand (weight 2 — demand signal)
+  if (globalData.crack !== undefined) {
+    let s = 0;
+    if (globalData.crack > 30) s = -0.8; else if (globalData.crack > 20) s = -0.3;
+    else if (globalData.crack < 5) s = 0.8; else if (globalData.crack < 10) s = 0.4;
+    components.push({ v: s, w: 2 });
+  }
+  // 7. Price Momentum — spot vs 3M avg (weight 1.5)
+  if (globalData.priceMomentum) {
+    const dev = globalData.priceMomentum.deviation;
+    components.push({ v: Math.max(-1, Math.min(1, -dev / 15)), w: 1.5 });
+  }
+  // 8. DXY — dollar strength (weight 1.5 — global purchasing power)
   if (globalData.dxy) {
     const dxy = globalData.dxy.price;
     let s = 0;
-    if (dxy > 108) s = 0.8; // very strong $ = reduced global demand = oversupply
-    else if (dxy > 104) s = 0.3;
-    else if (dxy < 95) s = -0.6; // weak $ = cheap oil globally = more demand = tight
-    else if (dxy < 98) s = -0.2;
-    components.push({ v: s, w: 2 });
+    if (dxy > 108) s = 0.8; else if (dxy > 104) s = 0.3;
+    else if (dxy < 95) s = -0.6; else if (dxy < 98) s = -0.2;
+    components.push({ v: s, w: 1.5 });
   }
-  // 7. Brent-WTI spread (weight 1 — Atlantic basin indicator)
+  // 9. Brent-WTI spread (weight 0.5 — Atlantic basin flow indicator)
   if (latestPrices.brent && latestPrices.wti) {
     const spread = latestPrices.brent.price - latestPrices.wti.price;
     let s = 0;
     if (spread > 8) s = -0.8; else if (spread > 5) s = -0.3;
     else if (spread < 2) s = 0.8; else if (spread < 3) s = 0.3;
+    components.push({ v: s, w: 0.5 });
+  }
+
+  // ── US INDICATORS (weight ~5.5) ──
+
+  // 10. US Inventory level vs 5yr avg (weight 1.5)
+  if (eiaData.inventory.length > 0) {
+    const current = parseInt(eiaData.inventory[0].value) / 1000;
+    const avg5yr = (eiaData.fiveYrAvg || 430000) / 1000;
+    const diff = current - avg5yr;
+    components.push({ v: Math.max(-1, Math.min(1, diff / 50)), w: 1.5 });
+  }
+  // 11. Inventory trend — 5-week direction (weight 1)
+  if (eiaData.inventory.length >= 5) {
+    const recent = eiaData.inventory.slice(0, 5).map(r => parseInt(r.value));
+    const trend = (recent[0] - recent[4]) / 1000;
+    components.push({ v: Math.max(-1, Math.min(1, trend / 10)), w: 1 });
+  }
+  // 12. Cushing OK stocks level (weight 1 — WTI delivery point)
+  if (eiaData.cushingData.length > 0) {
+    const cushing = parseInt(eiaData.cushingData[0].value) / 1000;
+    let s = 0;
+    if (cushing > 50) s = 0.8; else if (cushing > 40) s = 0.4;
+    else if (cushing < 22) s = -0.8; else if (cushing < 30) s = -0.4;
     components.push({ v: s, w: 1 });
   }
-  // 8. US production growth (weight 1)
+  // 13. US production growth (weight 1)
   if (eiaData.prodData.length >= 2) {
     const latest = parseInt(eiaData.prodData[0].value);
     const prev = parseInt(eiaData.prodData[1].value);
     const growth = (latest - prev) / prev * 100;
     components.push({ v: Math.max(-1, Math.min(1, growth * 0.5)), w: 1 });
   }
-  // 9. VIX — fear gauge (weight 1.5)
-  const vix = latestPrices.vix?.price;
-  if (vix) {
-    let s = 0;
-    if (vix > 35) s = -1; else if (vix > 25) s = -0.5; else if (vix < 15) s = 0.5;
-    components.push({ v: s, w: 1.5 });
-  }
-
-  // 10. Cushing OK stocks level (weight 1.5 — WTI delivery point, tightness gauge)
-  if (eiaData.cushingData.length > 0) {
-    const cushing = parseInt(eiaData.cushingData[0].value) / 1000; // MB
-    // Cushing capacity ~76MB. Below 25MB = tight, above 45MB = well-supplied
-    let s = 0;
-    if (cushing > 50) s = 0.8; // very full = oversupply
-    else if (cushing > 40) s = 0.4;
-    else if (cushing < 22) s = -0.8; // critically low = very tight
-    else if (cushing < 30) s = -0.4;
-    components.push({ v: s, w: 1.5 });
-  }
-  // 11. Net Imports trend (weight 1 — rising net imports = tighter domestic, falling = looser)
+  // 14. Net Imports trend (weight 1 — domestic flow indicator)
   if (eiaData.importsData.length >= 4 && eiaData.exportsData.length >= 4) {
     const recentNet = [];
     for (let i = 0; i < 4; i++) {
       recentNet.push(parseInt(eiaData.importsData[i].value) - parseInt(eiaData.exportsData[i].value));
     }
-    const trend = (recentNet[0] - recentNet[3]) / 1000; // change in mb/d over 4 weeks
-    // Rising net imports = more foreign oil needed = domestic tightness → negative (tight)
-    // Falling net imports = more self-sufficient = domestic surplus → positive (oversupply)
+    const trend = (recentNet[0] - recentNet[3]) / 1000;
     components.push({ v: Math.max(-1, Math.min(1, -trend / 1.5)), w: 1 });
+  }
+
+  // ── MACRO (weight ~2) ──
+
+  // 15. VIX — fear gauge (weight 1 — risk appetite, indirect)
+  const vix = latestPrices.vix?.price;
+  if (vix) {
+    let s = 0;
+    if (vix > 35) s = -1; else if (vix > 25) s = -0.5; else if (vix < 15) s = 0.5;
+    components.push({ v: s, w: 1 });
   }
 
   // Weighted average: missing components excluded, not zeroed
@@ -1209,7 +1329,7 @@ function calculateOSI() {
   const dataSources = components.length;
   document.getElementById('osi-marker').style.left = score + '%';
   document.getElementById('osi-value').textContent = score;
-  const label = score > 70 ? 'OVERSUPPLIED' : score > 58 ? 'LEAN OVERSUPPLY' : score > 42 ? 'BALANCED' : score > 30 ? 'LEAN TIGHT' : 'TIGHT SUPPLY';
+  const label = score > 70 ? 'SURPLUS' : score > 58 ? 'LEAN SURPLUS' : score > 42 ? 'BALANCED' : score > 30 ? 'LEAN TIGHT' : 'TIGHT';
   const dataLabel = dataSources < maxSources ? ` [${dataSources}/${maxSources}]` : '';
   document.getElementById('osi-label').textContent = label + dataLabel;
   const color = score > 65 ? 'var(--green)' : score > 45 ? 'var(--accent)' : 'var(--red)';
@@ -1242,13 +1362,14 @@ async function refreshAll() {
     loadNews(),
     loadCushing(),
     loadNetImports(),
+    loadSTEO(),
   ]);
   // Phase 2: Yahoo-heavy calls AFTER phase 1 to avoid proxy rate-limiting
   try { await loadGlobalIndicators(); } catch(e) {}
   try { await loadPriceMomentum(); } catch(e) {}
   try { await loadTermStructure(); } catch(e) {}
   updateGlobalPanel();
-  calculateOSI();
+  calculateSCI();
   updateApiStatus();
   setLastUpdated();
   const hasErrors = Object.values(apiStatus).some(v => v === 'err');
@@ -1274,16 +1395,21 @@ window.addEventListener('load', async () => {
 // ==========================================
 const infoContent = {
   osi: {
-    title: 'Oversupply Confidence Index (OSI)',
-    text: `<p>The OSI is a weighted average of <span class="info-term">11 indicators</span> that together estimate the likelihood of an oil oversupply. Score 0–100.</p>
-<p><span class="info-term">0–30 = Tight Supply</span> (red): market scarcity, upward price pressure.<br>
-<span class="info-term">30–45 = Leaning Tight</span><br>
-<span class="info-term">45–55 = Balanced</span>: equilibrium between supply and demand.<br>
-<span class="info-term">55–70 = Leaning Oversupplied</span><br>
-<span class="info-term">70–100 = Oversupplied</span> (green): excess supply, downward price pressure.</p>
-<p><span class="info-term">Components & weights:</span><br>
-Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory vs 5yr avg (2) · Price Momentum (2) · DXY (2) · Cushing OK Stocks (1.5) · Inventory Trend (1.5) · VIX (1.5) · Brent-WTI Spread (1) · Net Imports Trend (1) · US Production Growth (1)</p>
-<p>Each component is normalized to −1 (tight) to +1 (oversupplied), multiplied by its weight, and averaged into a final score. Missing data sources are excluded (not zeroed), preventing bias.</p>`
+    title: 'Supply Confidence Index (SCI)',
+    text: `<p>The SCI is a weighted composite of <span class="info-term">15 indicators</span> — global and US — that estimates the current oil supply balance. Score 0–100.</p>
+<p><span class="info-term">0–30 = Tight</span> (red): scarcity, upward price pressure.<br>
+<span class="info-term">30–42 = Lean Tight</span><br>
+<span class="info-term">42–58 = Balanced</span>: equilibrium between supply and demand.<br>
+<span class="info-term">58–70 = Lean Surplus</span><br>
+<span class="info-term">70–100 = Surplus</span> (green): excess supply, downward price pressure.</p>
+<p><span class="info-term">Global fundamentals (~43%):</span><br>
+World S/D Balance (4) · OPEC Production Trend (3) · Non-OECD Demand YoY (2.5) · Brent Price (2.5)</p>
+<p><span class="info-term">Market structure (~30%):</span><br>
+Term Structure (3) · Crack Spread (2) · Price Momentum (1.5) · DXY (1.5) · Brent-WTI (0.5)</p>
+<p><span class="info-term">US data (~20%):</span><br>
+Inventory vs 5yr (1.5) · Cushing OK (1) · Inventory Trend (1) · US Production (1) · Net Imports (1)</p>
+<p><span class="info-term">Macro (~4%):</span> VIX (1)</p>
+<p>Each component is normalized to −1 (tight) to +1 (surplus), multiplied by its weight, and averaged. Missing sources are excluded, not zeroed. Global data: EIA STEO (monthly). Market data: Yahoo Finance (~15 min delayed).</p>`
   },
   price: {
     title: 'Brent & WTI Price Chart',
@@ -1298,37 +1424,40 @@ Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory v
 <p><span class="info-term">Bars</span> show current inventory compared to the 5-year average. Longer = above average = more inventory.</p>
 <p><span class="info-term">Weekly change</span>: an increase (build) suggests lower demand or higher supply — bearish for prices. A decrease (draw) suggests higher demand or lower supply — bullish.</p>
 <p><span class="info-term">Cushing, OK</span>: the WTI delivery point hub. Capacity ~76MB. Levels below 25MB signal operational tightness and upward WTI pressure.</p>
-<p><span class="info-term">Net Imports</span>: US crude imports minus exports. Rising = tighter domestic supply (needs more foreign oil). Falling = more self-sufficient, potential global oversupply.</p>
+<p><span class="info-term">Net Imports</span>: US crude imports minus exports. Rising = tighter domestic supply (needs more foreign oil). Falling = more self-sufficient, potential global surplus.</p>
 <p>The US is the world's largest oil consumer, making this data a key barometer — but it reflects only one country.</p>`
   },
   global: {
     title: 'Global Supply Signals',
-    text: `<p>Four market indicators providing a picture of the global oil market:</p>
+    text: `<p>Seven market indicators providing a picture of the global oil market:</p>
 <p><span class="info-term">Term Structure</span> (front vs 6-month forward): compares today's Brent price with the futures contract 6 months out.<br>
 • <span class="info-term">Backwardation</span> (front > 6M): market is currently tight, buyers pay a premium for immediate delivery.<br>
 • <span class="info-term">Contango</span> (front < 6M): ample supply, future price is higher due to storage costs.</p>
 <p><span class="info-term">Price Momentum</span>: current Brent spot vs 3-month rolling average. Shows whether the trend is rising or falling, and how strongly.</p>
 <p><span class="info-term">Gasoline Crack Spread</span>: (gasoline price × 42) − Brent. Measures refining margin. High crack = strong demand for refined products. Low crack = weak demand.</p>
-<p><span class="info-term">Dollar Index (DXY)</span>: oil is traded in dollars. A strong dollar (DXY >104) makes oil more expensive for non-dollar countries → lower demand → bearish.</p>`
+<p><span class="info-term">Dollar Index (DXY)</span>: oil is traded in dollars. A strong dollar (DXY >104) makes oil more expensive for non-dollar countries → lower demand → bearish.</p>
+<p><span class="info-term">World Balance</span>: global production minus consumption (EIA STEO estimates). Positive = surplus oil on the market. Negative = deficit, upward price pressure.</p>
+<p><span class="info-term">OPEC Supply</span>: total OPEC petroleum production. Rising = more barrels flooding the market. OPEC controls ~30% of global output and can tighten/flood at will.</p>
+<p><span class="info-term">Non-OECD Demand</span>: liquid fuels consumption from non-OECD countries (China, India, SE Asia, Middle East). This is where marginal demand growth comes from. Rising = tighter market.</p>`
   },
   news: {
     title: 'Energy News Feed',
     text: `<p>Live news feed via RSS from various energy sources. Headlines are automatically fetched and refreshed every update cycle (3 min).</p>
 <p>Click any headline to open the full article. The <span class="info-term">quick links</span> below provide direct access to key energy news sources.</p>
-<p>Tip: news about Hormuz, OPEC decisions, sanctions, and geopolitical tensions has direct impact on oil markets and the OSI score.</p>`
+<p>Tip: news about Hormuz, OPEC decisions, sanctions, and geopolitical tensions has direct impact on oil markets and the SCI score.</p>`
   },
   spr: {
     title: 'Strategic Petroleum Reserve (SPR)',
     text: `<p>The <span class="info-term">Strategic Petroleum Reserve</span> is the US emergency crude oil stockpile, stored in salt caverns along the Gulf of Mexico.</p>
 <p>Historical peak: ~727 million barrels. After massive releases in 2022 (for price stabilization), levels dropped sharply. The government is slowly refilling.</p>
-<p><span class="info-term">Low SPR level</span> = less buffer against supply shocks (such as a Hormuz blockade) → tight signal for the OSI.<br>
-<span class="info-term">High SPR level</span> = more buffer, less vulnerable → oversupply signal.</p>
+<p><span class="info-term">Low SPR level</span> = less buffer against supply shocks (such as a Hormuz blockade) → tight signal for the SCI.<br>
+<span class="info-term">High SPR level</span> = more buffer, less vulnerable → surplus signal.</p>
 <p>Source: EIA Weekly Petroleum Status Report.</p>`
   },
   prod: {
     title: 'US Crude Oil Production',
     text: `<p>Weekly US crude oil production in million barrels per day (Mb/d). The US is currently the <span class="info-term">world's largest oil producer</span> (~13.5 Mb/d).</p>
-<p><span class="info-term">Rising production</span> = more supply on the global market → oversupply signal.<br>
+<p><span class="info-term">Rising production</span> = more supply on the global market → surplus signal.<br>
 <span class="info-term">Falling production</span> = less supply → tight supply signal.</p>
 <p>The chart shows the trend over recent months. Note: this covers US production only. OPEC+ output (Saudi Arabia, Russia, etc.) is equally important but not available in real-time.</p>
 <p>Source: EIA Weekly Petroleum Status Report.</p>`
@@ -1338,9 +1467,9 @@ Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory v
     text: `<p><span class="info-term">Cushing, OK</span> is the physical delivery point for WTI futures contracts and the most important crude oil storage hub in the US. Total shell capacity is approximately <span class="info-term">76 million barrels</span>.</p>
 <p><span class="info-term">Below 25 MB</span>: operationally tight — pipelines and refineries struggle to access oil, WTI prices spike upward.<br>
 <span class="info-term">25–35 MB</span>: moderate levels, functioning normally.<br>
-<span class="info-term">Above 45 MB</span>: well-supplied, signals potential oversupply in the US midcontinent.</p>
+<span class="info-term">Above 45 MB</span>: well-supplied, signals potential surplus in the US midcontinent.</p>
 <p>Cushing levels are a key leading indicator for WTI price direction and are closely watched by oil traders worldwide.</p>
-<p><span class="info-term">OSI weight: 1.5</span> — low Cushing = tight signal, high Cushing = oversupply signal.</p>
+<p><span class="info-term">SCI weight: 1</span> — low Cushing = tight signal, high Cushing = surplus signal.</p>
 <p>Source: EIA Weekly Petroleum Status Report.</p>`
   },
   netimports: {
@@ -1349,7 +1478,7 @@ Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory v
 <p>The US was historically a major net importer, but the shale revolution turned it into a significant exporter. Today net imports fluctuate around <span class="info-term">2–3 mb/d</span>.</p>
 <p><span class="info-term">Rising net imports</span>: the US needs more foreign oil → domestic supply is tight, bullish for prices.<br>
 <span class="info-term">Falling net imports</span>: the US is more self-sufficient → domestic surplus, bearish for prices, and more US crude available for global markets.</p>
-<p><span class="info-term">OSI weight: 1.0</span> — the 4-week trend is tracked. Rising = tight signal, falling = oversupply signal.</p>
+<p><span class="info-term">SCI weight: 1</span> — the 4-week trend is tracked. Rising = tight signal, falling = surplus signal.</p>
 <p>Source: EIA Weekly Petroleum Status Report.</p>`
   }
 };
