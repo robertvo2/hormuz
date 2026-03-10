@@ -10,7 +10,7 @@
 <style>
   :root {
     --bg: #0a0c0f; --panel: #0f1318; --border: #1e2530; --accent: #e8a020;
-    --red: #e03030; --green: #20c060; --blue: #2a080e0; --dim: #3a4555;
+    --red: #e03030; --green: #20c060; --blue: #2080e0; --dim: #3a4555;
     --text: #dde8f0; --muted: #6a7f95;
     --mono: 'JetBrains Mono', monospace; --sans: 'Barlow Condensed', sans-serif;
   }
@@ -165,13 +165,14 @@
   </div>
   <div class="header-meta">
     <div id="api-status"></div>
+    <div id="view-counter" style="cursor:default;opacity:0.7" title="Total page views">👁 <span id="view-count">--</span></div>
     <div>Updated: <span id="last-updated">--</span></div>
     <div id="clock">--:-- UTC</div>
   </div>
 </header>
 
 <div class="ticker-wrap">
-  <div class="ticker-label">LIVE</div>
+  <div class="ticker-label">DELAYED</div>
   <div class="ticker-inner">
     <div class="ticker-scroll">
       <span class="ticker-item"><span class="sym">BRENT</span><span id="t-brent">...</span></span>
@@ -414,7 +415,12 @@ async function fetchYahooHistory(symbol, range, interval) {
   return null;
 }
 
-const EIA_KEY = 'f6NK52MeWn2cnNTVQjS8faDQK0im65vjNObcrglx';
+// ⚠️ API KEY EXPOSURE WARNING: This key is visible in client-side code.
+// For production use, set up a Cloudflare Worker or Vercel Edge Function as a proxy
+// to hide the key server-side. See: https://developers.cloudflare.com/workers/
+// Light obfuscation below prevents casual scraping but is NOT real security.
+const _k = ['f6NK52Me','Wn2cnNTV','QjS8faDQ','K0im65vj','NObcrglx'];
+const EIA_KEY = _k.join('');
 async function fetchEia(route, params = {}) {
   const qp = new URLSearchParams({ api_key: EIA_KEY, ...params });
   const url = `https://api.eia.gov/v2/${route}?${qp}`;
@@ -588,7 +594,29 @@ function renderPriceChart(brent, wti, timeUnit) {
 // ==========================================
 // EIA INVENTORY
 // ==========================================
-let eiaData = { inventory: [], sprData: [], prodData: [] };
+let eiaData = { inventory: [], sprData: [], prodData: [], fiveYrAvg: null };
+
+// Fetch 5-year average from EIA (260 weeks ≈ 5 years)
+async function loadFiveYrAvg() {
+  try {
+    const data = await fetchEia('petroleum/sum/sndw/data', {
+      frequency: 'weekly', 'data[0]': 'value', 'facets[series][]': 'WCESTUS1',
+      'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 260,
+    });
+    const rows = data?.response?.data;
+    if (rows?.length > 100) {
+      const sum = rows.reduce((s, r) => s + parseInt(r.value), 0);
+      eiaData.fiveYrAvg = Math.round(sum / rows.length);
+      localStorage.setItem('hormuz_5yr_avg', JSON.stringify({ value: eiaData.fiveYrAvg, ts: Date.now() }));
+    }
+  } catch(e) {
+    // Fallback: try cached value
+    try {
+      const cached = JSON.parse(localStorage.getItem('hormuz_5yr_avg'));
+      if (cached?.value) eiaData.fiveYrAvg = cached.value;
+    } catch(e2) {}
+  }
+}
 
 async function loadEIA() {
   try {
@@ -600,7 +628,8 @@ async function loadEIA() {
     if (!rows?.length) throw new Error('No EIA data');
     eiaData.inventory = rows;
 
-    const FYR_AVG = 430000;
+    // Use dynamic 5yr average, fallback to 430MB if not yet loaded
+    const FYR_AVG = eiaData.fiveYrAvg || 430000;
     const latest = parseInt(rows[0].value);
     const prev = parseInt(rows[1].value);
     const wow = latest - prev;
@@ -758,14 +787,26 @@ async function loadNews() {
   allItems.sort((a, b) => b.date - a.date);
   const el = document.getElementById('news-content');
   if (allItems.length === 0) {
+    // Try to show cached news instead of "unavailable"
+    try {
+      const cached = JSON.parse(localStorage.getItem('hormuz_rss_cache'));
+      if (cached?.html) {
+        el.innerHTML = `<div style="font-family:var(--mono);font-size:7px;color:var(--dim);margin-bottom:4px">⚠ Showing cached results (live RSS temporarily unavailable)</div>` + cached.html;
+        apiStatus.rss = 'err';
+        return;
+      }
+    } catch(e) {}
     el.innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--muted)">RSS feeds unavailable. Use links below.</div>`;
     apiStatus.rss = 'err';
     return;
   }
   apiStatus.rss = 'ok';
-  el.innerHTML = allItems.slice(0, 15).map(it =>
+  const newsHtml = allItems.slice(0, 15).map(it =>
     `<div class="news-item"><a href="${it.link}" target="_blank">${it.title}</a><div class="news-src">${it.src} · ${it.date.toLocaleDateString('en-GB', {day:'numeric',month:'short'})}</div></div>`
   ).join('');
+  el.innerHTML = newsHtml;
+  // Cache successful RSS results
+  try { localStorage.setItem('hormuz_rss_cache', JSON.stringify({ html: newsHtml, ts: Date.now() })); } catch(e) {}
 }
 
 // ==========================================
@@ -896,12 +937,13 @@ function calculateOSI() {
   // Missing data sources are excluded (not counted as 0), preventing bias
   // Positive = oversupply signal, Negative = tight supply signal
   const components = [];
-  const maxSources = 10;
+  const maxSources = 9;
 
   // 1. US Inventory level vs 5yr avg (weight 2 — US proxy for global stocks)
   if (eiaData.inventory.length > 0) {
     const current = parseInt(eiaData.inventory[0].value) / 1000;
-    const diff = current - 430;
+    const avg5yr = (eiaData.fiveYrAvg || 430000) / 1000;
+    const diff = current - avg5yr;
     components.push({ v: Math.max(-1, Math.min(1, diff / 50)), w: 2 });
   }
   // 2. Inventory trend — 5-week direction (weight 1.5)
@@ -1027,7 +1069,14 @@ async function refreshAll() {
 // ==========================================
 // INIT
 // ==========================================
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  // Load 5yr avg once (cached for 24h to avoid excess API calls)
+  const cached5yr = (() => { try { return JSON.parse(localStorage.getItem('hormuz_5yr_avg')); } catch(e) { return null; } })();
+  if (cached5yr?.value && (Date.now() - cached5yr.ts) < 86400000) {
+    eiaData.fiveYrAvg = cached5yr.value;
+  } else {
+    await loadFiveYrAvg();
+  }
   refreshAll();
   setInterval(refreshAll, 3 * 60 * 1000);
 });
@@ -1037,15 +1086,15 @@ window.addEventListener('load', () => {
 const infoContent = {
   osi: {
     title: 'Oversupply Confidence Index (OSI)',
-    text: `<p>The OSI is a weighted average of <span class="info-term">10 indicators</span> that together estimate the likelihood of an oil oversupply. Score 0–100.</p>
+    text: `<p>The OSI is a weighted average of <span class="info-term">9 indicators</span> that together estimate the likelihood of an oil oversupply. Score 0–100.</p>
 <p><span class="info-term">0–30 = Tight Supply</span> (red): market scarcity, upward price pressure.<br>
 <span class="info-term">30–45 = Leaning Tight</span><br>
 <span class="info-term">45–55 = Balanced</span>: equilibrium between supply and demand.<br>
 <span class="info-term">55–70 = Leaning Oversupplied</span><br>
 <span class="info-term">70–100 = Oversupplied</span> (green): excess supply, downward price pressure.</p>
 <p><span class="info-term">Components & weights:</span><br>
-Inventory change (5) · Inventory vs 5yr avg (5) · Production trend (5) · SPR level (5) · Price trend (4) · Crack Spread (3) · Term Structure (3) · VIX (2) · DXY (2) · Price Momentum (2)</p>
-<p>Each component is normalized to −1 (tight) to +1 (oversupplied), multiplied by its weight, and averaged into a final score.</p>`
+Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory vs 5yr avg (2) · Price Momentum (2) · DXY (2) · Inventory Trend (1.5) · VIX (1.5) · Brent-WTI Spread (1) · US Production Growth (1)</p>
+<p>Each component is normalized to −1 (tight) to +1 (oversupplied), multiplied by its weight, and averaged into a final score. Missing data sources are excluded (not zeroed), preventing bias.</p>`
   },
   price: {
     title: 'Brent & WTI Price Chart',
@@ -1106,7 +1155,25 @@ function showInfo(key) {
 function hideInfo() {
   document.getElementById('info-overlay').classList.remove('active');
 }
+// ── PAGE VIEW COUNTER (GoatCounter) ──
+async function loadViewCount() {
+  try {
+    // Replace 'hormuz' with your GoatCounter subdomain after signup
+    const GOATCOUNTER_SITE = 'hormuz';
+    const resp = await fetch(`https://${GOATCOUNTER_SITE}.goatcounter.com/counter/${encodeURIComponent(location.pathname || '/')}.json`);
+    if (resp.ok) {
+      const data = await resp.json();
+      const el = document.getElementById('view-count');
+      if (el && data.count) el.textContent = data.count;
+    }
+  } catch(e) { /* counter unavailable, no problem */ }
+}
+loadViewCount();
 </script>
+
+<!-- GoatCounter Analytics - free, privacy-friendly, no cookies -->
+<!-- SETUP: 1) Ga naar https://www.goatcounter.com  2) Maak gratis account "hormuz"  3) Verander 'hormuz' hieronder naar jouw subdomain -->
+<script data-goatcounter="https://hormuz.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 
 <!-- Info Popup Overlay -->
 <div class="info-overlay" id="info-overlay" onclick="if(event.target===this)hideInfo()">
