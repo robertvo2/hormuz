@@ -225,7 +225,6 @@
     <div class="tile-label">EUR / USD</div>
     <div class="tile-price" id="eur-price">--.-</div>
     <div class="tile-change" id="eur-chg">loading...</div>
-    <div class="tile-sub" id="conversion-val">€17k = $--</div>
   </div>
   <div class="price-tile">
     <div class="tile-label">Gold</div>
@@ -518,7 +517,6 @@ function updatePriceTiles() {
     const eel = document.getElementById('eur-chg');
     eel.textContent = fmtChg(e.change, e.pct);
     eel.className = 'tile-change ' + (e.change >= 0 ? 'up' : 'dn');
-    document.getElementById('conversion-val').textContent = '€17k = $' + (17000 / (1/e.price)).toFixed(0);
     ['t-eur','t-eur2'].forEach(id => document.getElementById(id).textContent = e.price.toFixed(4));
   }
   const g = latestPrices.gold;
