@@ -343,6 +343,12 @@
     <div id="eia-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
       <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading EIA...</div>
     </div>
+    <div style="border-top:1px solid var(--dim);margin-top:4px;padding-top:4px">
+      <div id="cushing-content" style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading Cushing...</div>
+    </div>
+    <div style="border-top:1px solid var(--dim);margin-top:4px;padding-top:4px">
+      <div id="netimport-content" style="font-family:var(--mono);font-size:9px;color:var(--muted)">Loading Net Imports...</div>
+    </div>
   </div>
 
   <!-- Global Supply Signals (col 4, row 1) -->
@@ -409,7 +415,7 @@
 </div>
 
 <footer>
-  <span>Data: Yahoo Finance (prices, DXY, crack, term structure, momentum) · EIA.gov · MarineTraffic — Auto-refresh: 3 min</span>
+  <span>Data: Yahoo Finance (prices, DXY, crack, term structure, momentum) · EIA.gov (stocks, Cushing, imports, exports, SPR, production) · MarineTraffic — Auto-refresh: 3 min</span>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
   </div>
@@ -665,7 +671,7 @@ function renderPriceChart(brent, wti, timeUnit) {
 // ==========================================
 // EIA INVENTORY
 // ==========================================
-let eiaData = { inventory: [], sprData: [], prodData: [], fiveYrAvg: null };
+let eiaData = { inventory: [], sprData: [], prodData: [], cushingData: [], importsData: [], exportsData: [], fiveYrAvg: null };
 
 // Fetch 5-year average from EIA (260 weeks ≈ 5 years)
 async function loadFiveYrAvg() {
@@ -753,6 +759,91 @@ async function loadEIA() {
     document.getElementById('eia-content').innerHTML = html;
   } catch(e) {
     document.getElementById('eia-content').innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--red)">EIA: ${e.message}</div>`;
+  }
+}
+
+// ==========================================
+// CUSHING, OK STOCKS
+// ==========================================
+async function loadCushing() {
+  try {
+    const data = await fetchEia('petroleum/sum/sndw/data', {
+      frequency: 'weekly', 'data[0]': 'value', 'facets[series][]': 'W_EPC0_SAX_YCUOK_MBBL',
+      'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 12,
+    });
+    const rows = data?.response?.data;
+    if (!rows?.length) return;
+    eiaData.cushingData = rows;
+    const latest = parseInt(rows[0].value);
+    const prev = parseInt(rows[1].value);
+    const wow = latest - prev;
+    const wowColor = wow < 0 ? 'var(--red)' : 'var(--green)';
+    // Cushing capacity ~76MB, operational min ~20MB. Levels below 25MB signal tightness
+    const level = latest / 1000;
+    const levelColor = level < 25 ? 'var(--red)' : level < 35 ? 'var(--accent)' : 'var(--green)';
+    const el = document.getElementById('cushing-content');
+    if (el) el.innerHTML = `<div class="eia-summary" style="margin-bottom:0">
+      <div class="eia-stat">
+        <div class="eia-stat-label">Cushing OK</div>
+        <div class="eia-stat-val" style="color:${levelColor}">${level.toFixed(1)}<span style="font-size:10px;color:var(--muted)"> MB</span></div>
+        <div class="eia-stat-sub" style="color:${wowColor}">${wow>=0?'+':''}${(wow/1000).toFixed(1)}MB WoW</div>
+      </div>
+    </div>`;
+  } catch(e) {
+    const el = document.getElementById('cushing-content');
+    if (el) el.innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--red)">Cushing: ${e.message}</div>`;
+  }
+}
+
+// ==========================================
+// NET IMPORTS (Imports - Exports)
+// ==========================================
+async function loadNetImports() {
+  try {
+    const [impData, expData] = await Promise.all([
+      fetchEia('petroleum/sum/sndw/data', {
+        frequency: 'weekly', 'data[0]': 'value', 'facets[series][]': 'WCRIMUS2',
+        'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 12,
+      }),
+      fetchEia('petroleum/sum/sndw/data', {
+        frequency: 'weekly', 'data[0]': 'value', 'facets[series][]': 'WCREXUS2',
+        'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 12,
+      }),
+    ]);
+    const impRows = impData?.response?.data;
+    const expRows = expData?.response?.data;
+    if (!impRows?.length || !expRows?.length) return;
+    eiaData.importsData = impRows;
+    eiaData.exportsData = expRows;
+    const latImp = parseInt(impRows[0].value);
+    const latExp = parseInt(expRows[0].value);
+    const net = latImp - latExp;
+    const prevImp = parseInt(impRows[1].value);
+    const prevExp = parseInt(expRows[1].value);
+    const prevNet = prevImp - prevExp;
+    const change = net - prevNet;
+    const changeColor = change > 0 ? 'var(--red)' : 'var(--green)';
+    // Rising net imports = tighter domestic supply; falling = more self-sufficient
+    const netColor = net > 3000 ? 'var(--red)' : net > 0 ? 'var(--accent)' : 'var(--green)';
+    const el = document.getElementById('netimport-content');
+    if (el) el.innerHTML = `<div class="eia-summary" style="margin-bottom:0">
+      <div class="eia-stat">
+        <div class="eia-stat-label">Net Import</div>
+        <div class="eia-stat-val" style="color:${netColor}">${(net/1000).toFixed(1)}<span style="font-size:10px;color:var(--muted)"> mb/d</span></div>
+        <div class="eia-stat-sub" style="color:${changeColor}">${change>=0?'+':''}${(change/1000).toFixed(1)} WoW</div>
+      </div>
+      <div class="eia-stat">
+        <div class="eia-stat-label">Imports</div>
+        <div class="eia-stat-val">${(latImp/1000).toFixed(1)}<span style="font-size:10px;color:var(--muted)"> mb/d</span></div>
+      </div>
+      <div class="eia-stat">
+        <div class="eia-stat-label">Exports</div>
+        <div class="eia-stat-val">${(latExp/1000).toFixed(1)}<span style="font-size:10px;color:var(--muted)"> mb/d</span></div>
+      </div>
+    </div>`;
+  } catch(e) {
+    const el = document.getElementById('netimport-content');
+    if (el) el.innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--red)">Net Imports: ${e.message}</div>`;
   }
 }
 
@@ -1008,7 +1099,7 @@ function calculateOSI() {
   // Missing data sources are excluded (not counted as 0), preventing bias
   // Positive = oversupply signal, Negative = tight supply signal
   const components = [];
-  const maxSources = 9;
+  const maxSources = 11;
 
   // 1. US Inventory level vs 5yr avg (weight 2 — US proxy for global stocks)
   if (eiaData.inventory.length > 0) {
@@ -1084,6 +1175,29 @@ function calculateOSI() {
     components.push({ v: s, w: 1.5 });
   }
 
+  // 10. Cushing OK stocks level (weight 1.5 — WTI delivery point, tightness gauge)
+  if (eiaData.cushingData.length > 0) {
+    const cushing = parseInt(eiaData.cushingData[0].value) / 1000; // MB
+    // Cushing capacity ~76MB. Below 25MB = tight, above 45MB = well-supplied
+    let s = 0;
+    if (cushing > 50) s = 0.8; // very full = oversupply
+    else if (cushing > 40) s = 0.4;
+    else if (cushing < 22) s = -0.8; // critically low = very tight
+    else if (cushing < 30) s = -0.4;
+    components.push({ v: s, w: 1.5 });
+  }
+  // 11. Net Imports trend (weight 1 — rising net imports = tighter domestic, falling = looser)
+  if (eiaData.importsData.length >= 4 && eiaData.exportsData.length >= 4) {
+    const recentNet = [];
+    for (let i = 0; i < 4; i++) {
+      recentNet.push(parseInt(eiaData.importsData[i].value) - parseInt(eiaData.exportsData[i].value));
+    }
+    const trend = (recentNet[0] - recentNet[3]) / 1000; // change in mb/d over 4 weeks
+    // Rising net imports = more foreign oil needed = domestic tightness → negative (tight)
+    // Falling net imports = more self-sufficient = domestic surplus → positive (oversupply)
+    components.push({ v: Math.max(-1, Math.min(1, -trend / 1.5)), w: 1 });
+  }
+
   // Weighted average: missing components excluded, not zeroed
   const totalW = components.reduce((s, c) => s + c.w, 0);
   const wSum = components.reduce((s, c) => s + c.v * c.w, 0);
@@ -1124,6 +1238,8 @@ async function refreshAll() {
     loadProduction(),
     loadPriceChart(),
     loadNews(),
+    loadCushing(),
+    loadNetImports(),
   ]);
   // Phase 2: Yahoo-heavy calls AFTER phase 1 to avoid proxy rate-limiting
   try { await loadGlobalIndicators(); } catch(e) {}
@@ -1157,14 +1273,14 @@ window.addEventListener('load', async () => {
 const infoContent = {
   osi: {
     title: 'Oversupply Confidence Index (OSI)',
-    text: `<p>The OSI is a weighted average of <span class="info-term">9 indicators</span> that together estimate the likelihood of an oil oversupply. Score 0–100.</p>
+    text: `<p>The OSI is a weighted average of <span class="info-term">11 indicators</span> that together estimate the likelihood of an oil oversupply. Score 0–100.</p>
 <p><span class="info-term">0–30 = Tight Supply</span> (red): market scarcity, upward price pressure.<br>
 <span class="info-term">30–45 = Leaning Tight</span><br>
 <span class="info-term">45–55 = Balanced</span>: equilibrium between supply and demand.<br>
 <span class="info-term">55–70 = Leaning Oversupplied</span><br>
 <span class="info-term">70–100 = Oversupplied</span> (green): excess supply, downward price pressure.</p>
 <p><span class="info-term">Components & weights:</span><br>
-Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory vs 5yr avg (2) · Price Momentum (2) · DXY (2) · Inventory Trend (1.5) · VIX (1.5) · Brent-WTI Spread (1) · US Production Growth (1)</p>
+Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory vs 5yr avg (2) · Price Momentum (2) · DXY (2) · Cushing OK Stocks (1.5) · Inventory Trend (1.5) · VIX (1.5) · Brent-WTI Spread (1) · Net Imports Trend (1) · US Production Growth (1)</p>
 <p>Each component is normalized to −1 (tight) to +1 (oversupplied), multiplied by its weight, and averaged into a final score. Missing data sources are excluded (not zeroed), preventing bias.</p>`
   },
   price: {
@@ -1177,8 +1293,10 @@ Brent Price Level (3) · Term Structure (3) · Crack Spread (2.5) · Inventory v
   eia: {
     title: 'EIA Crude Oil Inventory',
     text: `<p>Weekly US crude oil stocks reported by the <span class="info-term">Energy Information Administration</span> (EIA, part of the US Dept. of Energy).</p>
-<p><span class="info-term">Bars</span> show current inventory per category (Cushing, SPR, etc.) compared to the 5-year average. Longer = above average = more inventory.</p>
+<p><span class="info-term">Bars</span> show current inventory compared to the 5-year average. Longer = above average = more inventory.</p>
 <p><span class="info-term">Weekly change</span>: an increase (build) suggests lower demand or higher supply — bearish for prices. A decrease (draw) suggests higher demand or lower supply — bullish.</p>
+<p><span class="info-term">Cushing, OK</span>: the WTI delivery point hub. Capacity ~76MB. Levels below 25MB signal operational tightness and upward WTI pressure.</p>
+<p><span class="info-term">Net Imports</span>: US crude imports minus exports. Rising = tighter domestic supply (needs more foreign oil). Falling = more self-sufficient, potential global oversupply.</p>
 <p>The US is the world's largest oil consumer, making this data a key barometer — but it reflects only one country.</p>`
   },
   global: {
