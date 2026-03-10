@@ -149,10 +149,81 @@
   .info-popup .info-close { font-family: var(--mono); font-size: 8px; color: var(--muted); cursor: pointer; float: right; border: 1px solid var(--dim); padding: 1px 6px; margin-left: 8px; }
   .info-popup .info-close:hover { border-color: var(--accent); color: var(--accent); }
 
+  /* TABLET */
   @media (max-width: 1200px) {
+    html, body { overflow: auto; height: auto; }
+    body { height: auto; }
     .main-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
-    .g-price, .g-eia, .g-hormuz, .g-spr, .g-prod, .g-spread { grid-column: auto; grid-row: auto; }
-    html, body { overflow: auto; }
+    .g-price, .g-eia, .g-hormuz, .g-map, .g-news, .g-mini { grid-column: auto; grid-row: auto; }
+    .g-price { grid-column: 1 / -1; min-height: 280px; }
+    .g-map { min-height: 300px; }
+    .g-map iframe { position: relative; height: 300px; }
+    .panel { min-height: 200px; }
+    .mini-chart { min-height: 150px; }
+  }
+
+  /* MOBILE */
+  @media (max-width: 768px) {
+    html, body { overflow: auto; height: auto; }
+    body { height: auto; }
+
+    /* Header: stack vertically */
+    header { flex-direction: column; height: auto; padding: 6px 10px; gap: 4px; align-items: flex-start; }
+    .header-meta { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+    h1 { font-size: 12px; letter-spacing: 2px; }
+
+    /* Ticker */
+    .ticker-wrap { height: 24px; }
+    .ticker-item { font-size: 10px; margin-right: 18px; }
+
+    /* Price row: 3x2 grid */
+    .price-row { grid-template-columns: repeat(3, 1fr); }
+    .tile-price { font-size: 16px; }
+    .tile-label { font-size: 7px; }
+
+    /* OSI meter */
+    .oversupply-header .reading { font-size: 16px; }
+
+    /* Main grid: single column */
+    .main-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+    }
+    .g-price, .g-eia, .g-hormuz, .g-map, .g-news, .g-mini { grid-column: auto; grid-row: auto; }
+    .g-price { min-height: 250px; }
+    .g-map { min-height: 350px; }
+    .g-map iframe { position: relative; height: 350px; }
+    .g-news { max-height: 400px; }
+    .g-hormuz { max-height: none; overflow-y: visible; }
+    .panel { min-height: 180px; overflow: visible; }
+    .mini-chart { min-height: 160px; }
+
+    /* News items: bigger touch targets */
+    .news-item { padding: 8px 0; }
+    .news-item a { font-size: 11px; line-height: 1.4; }
+    .news-item .news-src { font-size: 9px; }
+
+    /* Hormuz stats */
+    .hormuz-stat { font-size: 11px; padding: 5px 0; }
+
+    /* Footer */
+    footer { height: auto; padding: 6px 10px; flex-wrap: wrap; gap: 4px; }
+
+    /* Info popup: full width on mobile */
+    .info-popup { max-width: 95%; padding: 10px 12px; }
+    .info-popup p { font-size: 11px; }
+  }
+
+  /* SMALL PHONES */
+  @media (max-width: 480px) {
+    .price-row { grid-template-columns: repeat(2, 1fr); }
+    .tile-price { font-size: 18px; }
+    h1 { font-size: 11px; letter-spacing: 1px; }
+    .header-meta { font-size: 8px; }
+    .eia-summary { flex-direction: column; }
+    .bar-row { flex-wrap: wrap; }
+    .bar-label { width: 100%; margin-bottom: 2px; }
+    .bar-val { width: 100%; text-align: left; margin-top: 2px; }
   }
 </style>
 </head>
