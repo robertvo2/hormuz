@@ -75,7 +75,8 @@
   .panel-title { font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: 1.5px; color: #8aa0b8; text-transform: uppercase; margin-bottom: 4px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
   .panel-title::after { content:''; flex:1; height:1px; background: var(--border); }
 
-  .chart-panel canvas { width: 100% !important; flex: 1; min-height: 0; }
+  .chart-wrap { position: relative; flex: 1; min-height: 0; }
+  .chart-wrap canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
 
   /* Grid areas */
   .g-price { grid-column: 1 / 3; grid-row: 1; }
@@ -159,9 +160,7 @@
     .g-map { height: 300px; }
     .g-map iframe { position: relative; height: 300px; }
     .panel { overflow: hidden; }
-    .chart-panel canvas { max-height: 270px; }
-    .mini-chart { height: 170px; max-height: 170px; }
-    .mini-chart canvas { max-height: 140px; }
+    .mini-chart { height: 170px; }
   }
 
   /* MOBILE */
@@ -192,16 +191,14 @@
       grid-template-rows: auto;
     }
     .g-price, .g-eia, .g-hormuz, .g-map, .g-news, .g-mini { grid-column: auto; grid-row: auto; }
-    .g-price { height: 300px; }
+    .g-price { height: 280px; }
     .g-map { height: 350px; }
     .g-map iframe { position: relative; height: 350px; }
     .g-news { max-height: 400px; overflow-y: auto; }
     .g-hormuz { overflow-y: visible; }
     .g-mini { height: auto; }
     .panel { overflow: hidden; }
-    .chart-panel canvas { max-height: 260px; }
-    .mini-chart { height: 180px; max-height: 180px; }
-    .mini-chart canvas { max-height: 150px; }
+    .mini-chart { height: 160px; }
 
     /* News items: bigger touch targets */
     .news-item { padding: 8px 0; }
@@ -337,7 +334,7 @@
   <!-- Price Chart (col 1-2, row 1) -->
   <div class="panel chart-panel g-price">
     <div class="panel-title">Brent &amp; WTI — Recent <span id="chart-range-label"></span> <span class="info-btn" onclick="showInfo('price')">i</span></div>
-    <canvas id="priceChart"></canvas>
+    <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
   </div>
 
   <!-- EIA Inventory (col 3, row 1) -->
@@ -401,11 +398,11 @@
   <div class="panel g-mini">
     <div class="mini-chart" style="background:var(--panel);padding:4px 6px">
       <div class="panel-title">SPR <span id="spr-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span> <span class="info-btn" onclick="showInfo('spr')">i</span></div>
-      <canvas id="sprChart"></canvas>
+      <div class="chart-wrap"><canvas id="sprChart"></canvas></div>
     </div>
     <div class="mini-chart" style="background:var(--panel);padding:4px 6px">
       <div class="panel-title">US Production <span id="prod-info" style="font-size:7px;color:var(--muted);letter-spacing:0"></span> <span class="info-btn" onclick="showInfo('prod')">i</span></div>
-      <canvas id="prodChart"></canvas>
+      <div class="chart-wrap"><canvas id="prodChart"></canvas></div>
     </div>
   </div>
 
