@@ -311,7 +311,7 @@
   <div class="oversupply-header">
     <div>
       <div class="label">Supply Confidence Index</div>
-      <div class="sublabel">15 indicators: global balance, OPEC, non-OECD demand, inventories, prices, structure, macro <span class="info-btn" onclick="showInfo('osi')">i</span></div>
+      <div class="sublabel">17 indicators: global balance, OPEC, non-OECD demand, inventories, product stocks, prices, structure, macro <span class="info-btn" onclick="showInfo('osi')">i</span></div>
     </div>
     <div style="text-align:right;display:flex;align-items:center;gap:8px">
       <div class="sublabel" id="osi-label">Calculating...</div>
@@ -678,7 +678,7 @@ function renderPriceChart(brent, wti, timeUnit) {
 // ==========================================
 // EIA INVENTORY
 // ==========================================
-let eiaData = { inventory: [], sprData: [], prodData: [], cushingData: [], importsData: [], exportsData: [], fiveYrAvg: null };
+let eiaData = { inventory: [], sprData: [], prodData: [], cushingData: [], importsData: [], exportsData: [], gasolineData: [], distillateData: [], fiveYrAvg: null };
 
 // Fetch 5-year average from EIA (260 weeks ≈ 5 years)
 async function loadFiveYrAvg() {
@@ -847,6 +847,28 @@ async function loadNetImports() {
     const el = document.getElementById('netimport-content');
     if (el) el.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--red)">Net Imports: ${e.message}</div>`;
   }
+}
+
+// ==========================================
+// GASOLINE & DISTILLATE STOCKS (for SCI)
+// ==========================================
+async function loadProductStocks() {
+  try {
+    const [gasData, distData] = await Promise.all([
+      fetchEia('petroleum/sum/sndw/data', {
+        frequency: 'weekly', 'data[0]': 'value', 'facets[series][]': 'WGTSTUS1',
+        'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 6,
+      }),
+      fetchEia('petroleum/sum/sndw/data', {
+        frequency: 'weekly', 'data[0]': 'value', 'facets[series][]': 'WDISTUS1',
+        'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 6,
+      }),
+    ]);
+    const gasRows = gasData?.response?.data;
+    const distRows = distData?.response?.data;
+    if (gasRows?.length) eiaData.gasolineData = gasRows;
+    if (distRows?.length) eiaData.distillateData = distRows;
+  } catch(e) { /* silent — SCI will skip these components if data missing */ }
 }
 
 // ==========================================
@@ -1191,9 +1213,9 @@ function calculateSCI() {
   // Positive = surplus signal, Negative = tight supply signal
   //
   // WEIGHT PHILOSOPHY: Global fundamentals > Market structure > US data > Macro
-  // Total possible weight: ~28 (global ~12, market ~8.5, US ~5.5, macro ~2)
+  // Total possible weight: ~30 (global ~12, market ~8.5, US crude ~5.5, US products ~2, macro ~2)
   const components = [];
-  const maxSources = 15;
+  const maxSources = 17;
 
   // ── GLOBAL FUNDAMENTALS (highest weight ~12) ──
 
@@ -1305,9 +1327,26 @@ function calculateSCI() {
     components.push({ v: Math.max(-1, Math.min(1, -trend / 1.5)), w: 1 });
   }
 
+  // ── US PRODUCT INVENTORIES (weight ~2) ──
+
+  // 15. Gasoline Stocks trend — 4-week direction (weight 1)
+  if (eiaData.gasolineData.length >= 4) {
+    const recent = eiaData.gasolineData.slice(0, 4).map(r => parseInt(r.value));
+    const trend = (recent[0] - recent[3]) / 1000; // 4-week change in thousand barrels → MB
+    // Draws = tight (negative trend → negative score); Builds = surplus
+    components.push({ v: Math.max(-1, Math.min(1, trend / 8)), w: 1 });
+  }
+  // 16. Distillate Stocks trend — 4-week direction (weight 1)
+  if (eiaData.distillateData.length >= 4) {
+    const recent = eiaData.distillateData.slice(0, 4).map(r => parseInt(r.value));
+    const trend = (recent[0] - recent[3]) / 1000;
+    // Draws = tight; Builds = surplus. Distillates (diesel/heating oil) more volatile
+    components.push({ v: Math.max(-1, Math.min(1, trend / 6)), w: 1 });
+  }
+
   // ── MACRO (weight ~2) ──
 
-  // 15. VIX — fear gauge (weight 1 — risk appetite, indirect)
+  // 17. VIX — fear gauge (weight 1 — risk appetite, indirect)
   const vix = latestPrices.vix?.price;
   if (vix) {
     let s = 0;
@@ -1357,6 +1396,7 @@ async function refreshAll() {
     loadNews(),
     loadCushing(),
     loadNetImports(),
+    loadProductStocks(),
     loadSTEO(),
   ]);
   // Phase 2: Yahoo-heavy calls AFTER phase 1 to avoid proxy rate-limiting
@@ -1391,19 +1431,21 @@ window.addEventListener('load', async () => {
 const infoContent = {
   osi: {
     title: 'Supply Confidence Index (SCI)',
-    text: `<p>The SCI is a weighted composite of <span class="info-term">15 indicators</span> — global and US — that estimates the current oil supply balance. Score 0–100.</p>
+    text: `<p>The SCI is a weighted composite of <span class="info-term">17 indicators</span> — global and US — that estimates the current oil supply balance. Score 0–100.</p>
 <p><span class="info-term">0–30 = Tight</span> (red): scarcity, upward price pressure.<br>
 <span class="info-term">30–42 = Lean Tight</span><br>
 <span class="info-term">42–58 = Balanced</span>: equilibrium between supply and demand.<br>
 <span class="info-term">58–70 = Lean Surplus</span><br>
 <span class="info-term">70–100 = Surplus</span> (green): excess supply, downward price pressure.</p>
-<p><span class="info-term">Global fundamentals (~43%):</span><br>
+<p><span class="info-term">Global fundamentals (~40%):</span><br>
 World S/D Balance (4) · OPEC Production Trend (3) · Non-OECD Demand YoY (2.5) · Brent Price (2.5)</p>
-<p><span class="info-term">Market structure (~30%):</span><br>
+<p><span class="info-term">Market structure (~28%):</span><br>
 Term Structure (3) · Crack Spread (2) · Price Momentum (1.5) · DXY (1.5) · Brent-WTI (0.5)</p>
-<p><span class="info-term">US data (~20%):</span><br>
+<p><span class="info-term">US crude data (~18%):</span><br>
 Inventory vs 5yr (1.5) · Cushing OK (1) · Inventory Trend (1) · US Production (1) · Net Imports (1)</p>
-<p><span class="info-term">Macro (~4%):</span> VIX (1)</p>
+<p><span class="info-term">US product inventories (~7%):</span><br>
+Gasoline Stocks Trend (1) · Distillate Stocks Trend (1)</p>
+<p><span class="info-term">Macro (~3%):</span> VIX (1)</p>
 <p>Each component is normalized to −1 (tight) to +1 (surplus), multiplied by its weight, and averaged. Missing sources are excluded, not zeroed. Global data: EIA STEO (monthly). Market data: Yahoo Finance (~15 min delayed).</p>`
   },
   price: {
@@ -1420,6 +1462,7 @@ Inventory vs 5yr (1.5) · Cushing OK (1) · Inventory Trend (1) · US Production
 <p><span class="info-term">Weekly change</span>: an increase (build) suggests lower demand or higher supply — bearish for prices. A decrease (draw) suggests higher demand or lower supply — bullish.</p>
 <p><span class="info-term">Cushing, OK</span>: the WTI delivery point hub. Capacity ~76MB. Levels below 25MB signal operational tightness and upward WTI pressure.</p>
 <p><span class="info-term">Net Imports</span>: US crude imports minus exports. Rising = tighter domestic supply (needs more foreign oil). Falling = more self-sufficient, potential global surplus.</p>
+<p><span class="info-term">Gasoline & Distillate Stocks</span> (SCI components 15–16): 4-week trend in product inventories. Draws indicate strong downstream demand even if crude builds. <span class="info-btn" onclick="showInfo('productstocks')">i</span></p>
 <p>The US is the world's largest oil consumer, making this data a key barometer — but it reflects only one country.</p>`
   },
   global: {
@@ -1474,6 +1517,18 @@ Inventory vs 5yr (1.5) · Cushing OK (1) · Inventory Trend (1) · US Production
 <p><span class="info-term">Rising net imports</span>: the US needs more foreign oil → domestic supply is tight, bullish for prices.<br>
 <span class="info-term">Falling net imports</span>: the US is more self-sufficient → domestic surplus, bearish for prices, and more US crude available for global markets.</p>
 <p><span class="info-term">SCI weight: 1</span> — the 4-week trend is tracked. Rising = tight signal, falling = surplus signal.</p>
+<p>Source: EIA Weekly Petroleum Status Report.</p>`
+  },
+  productstocks: {
+    title: 'US Product Inventories (Gasoline & Distillates)',
+    text: `<p>Weekly US finished <span class="info-term">motor gasoline</span> and <span class="info-term">distillate fuel oil</span> (diesel, heating oil) stocks, reported by the EIA.</p>
+<p>Product inventories capture demand signals that crude stocks alone can miss. Crude can build while product stocks draw — indicating refineries are pulling crude but downstream demand is outpacing supply.</p>
+<p><span class="info-term">Gasoline draws</span>: strong consumer/transport demand → tight signal.<br>
+<span class="info-term">Gasoline builds</span>: weak demand or excess refining → surplus signal.</p>
+<p><span class="info-term">Distillate draws</span>: strong industrial/freight/heating demand → tight signal.<br>
+<span class="info-term">Distillate builds</span>: weak economic activity → surplus signal.</p>
+<p>The SCI tracks the <span class="info-term">4-week trend</span> for each. Gasoline is normalized over ±8 MB, distillates over ±6 MB (more volatile, smaller absolute stocks).</p>
+<p><span class="info-term">SCI weight: 1 each</span> (total 2). These indicators help explain why the SCI can move lower even when crude stocks build — if product markets are tightening.</p>
 <p>Source: EIA Weekly Petroleum Status Report.</p>`
   }
 };
