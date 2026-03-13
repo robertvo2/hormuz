@@ -311,7 +311,7 @@
   <div class="oversupply-header">
     <div>
       <div class="label">Supply Confidence Index</div>
-      <div class="sublabel">17 indicators: global balance, OPEC, non-OECD demand, inventories, product stocks, prices, structure, macro <span class="info-btn" onclick="showInfo('osi')">i</span></div>
+      <div class="sublabel">19 indicators: global balance, OPEC, spare capacity, non-OECD demand, inventories, product stocks, prices, structure, macro <span class="info-btn" onclick="showInfo('osi')">i</span></div>
     </div>
     <div style="text-align:right;display:flex;align-items:center;gap:8px">
       <div class="sublabel" id="osi-label">Calculating...</div>
@@ -370,6 +370,7 @@
     <div class="hormuz-stat" style="border-bottom:1px solid var(--dim)"></div>
     <div class="hormuz-stat"><span class="hs-label">World Balance</span><span class="hs-value" id="gs-worldbal">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">OPEC Supply</span><span class="hs-value" id="gs-opec">—</span></div>
+    <div class="hormuz-stat"><span class="hs-label">Spare Capacity</span><span class="hs-value" id="gs-spare">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">Non-OECD Demand</span><span class="hs-value" id="gs-nonoecd">—</span></div>
     <div class="hormuz-stat"><span class="hs-label">Global Signal</span><span class="hs-value" id="gs-global-signal">—</span></div>
     <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:4px;line-height:1.4">
@@ -422,7 +423,7 @@
 </div>
 
 <footer>
-  <span>Data: Yahoo Finance (prices, DXY, crack, term structure, momentum) · EIA.gov (stocks, Cushing, imports, exports, SPR, production) · EIA STEO (world balance, OPEC, non-OECD) · MarineTraffic — Auto-refresh: 3 min</span>
+  <span>Data: Yahoo Finance (prices, DXY, crack, term structure, momentum) · EIA.gov (stocks, Cushing, imports, exports, SPR, production) · EIA STEO (world balance, OPEC, spare capacity, non-OECD) · MarineTraffic — Auto-refresh: 3 min</span>
   <div style="display:flex;align-items:center;gap:8px">
     <button class="refresh-btn" onclick="refreshAll()">⟳ REFRESH</button>
   </div>
@@ -874,7 +875,7 @@ async function loadProductStocks() {
 // ==========================================
 // GLOBAL: WORLD BALANCE, OPEC, NON-OECD (STEO)
 // ==========================================
-let steoData = { worldProd: [], worldCons: [], opec: [], nonOecd: [] };
+let steoData = { worldProd: [], worldCons: [], opec: [], nonOecd: [], spareCapacity: null, saudiSpare: null };
 
 async function loadSTEO() {
   try {
@@ -882,16 +883,20 @@ async function loadSTEO() {
     // Use end parameter to exclude future forecasts (only actuals + near-term)
     const now = new Date();
     const endStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-    const [prodData, consData, opecData, nonOecdData] = await Promise.all([
+    const [prodData, consData, opecData, nonOecdData, spareData, saudiSpareData] = await Promise.all([
       fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PAPR_WORLD', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
       fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PATC_WORLD', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
       fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PAPR_OPEC', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
       fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'PATC_NON_OECD', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 14, end: endStr }),
+      fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'COPS_OPEC', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 6, end: endStr }),
+      fetchEia('steo/data', { frequency: 'monthly', 'data[0]': 'value', 'facets[seriesId][]': 'COPS_SA', 'sort[0][column]': 'period', 'sort[0][direction]': 'desc', length: 6, end: endStr }),
     ]);
     const pRows = prodData?.response?.data;
     const cRows = consData?.response?.data;
     const oRows = opecData?.response?.data;
     const nRows = nonOecdData?.response?.data;
+    const scRows = spareData?.response?.data;
+    const saRows = saudiSpareData?.response?.data;
 
     // World Supply/Demand Balance
     if (pRows?.length && cRows?.length) {
@@ -922,6 +927,21 @@ async function loadSTEO() {
       el.textContent = latest.toFixed(1) + ' mb/d (' + (change >= 0 ? '+' : '') + change.toFixed(2) + ')';
       el.style.color = chgColor;
       el.title = `OPEC total petroleum supply (${oRows[0].period})`;
+    }
+
+    // OPEC Effective Spare Capacity (COPS_OPEC excludes Iran/VE/LY already)
+    if (scRows?.length) {
+      const spare = parseFloat(scRows[0].value);
+      steoData.spareCapacity = spare;
+      const saudiSpare = saRows?.length ? parseFloat(saRows[0].value) : null;
+      steoData.saudiSpare = saudiSpare;
+      // Color: <2 mb/d = critical (red), 2-3 = tight (accent/orange), >3 = adequate (green)
+      const spareColor = spare < 2 ? 'var(--red)' : spare < 3 ? 'var(--accent)' : 'var(--green)';
+      const el = document.getElementById('gs-spare');
+      const saudiStr = saudiSpare !== null ? ` (SA: ${saudiSpare.toFixed(1)})` : '';
+      el.textContent = spare.toFixed(1) + ' mb/d' + saudiStr;
+      el.style.color = spareColor;
+      el.title = `OPEC effective spare capacity — excludes Iran, Venezuela, Libya (${scRows[0].period}). Saudi Arabia: ${saudiSpare !== null ? saudiSpare.toFixed(2) : '?'} mb/d`;
     }
 
     // Non-OECD Demand (Asia proxy)
@@ -1112,9 +1132,10 @@ function updateGlobalPanel() {
     globalData.crack = crack;
     const el = document.getElementById('gs-crack');
     el.textContent = '$' + crack.toFixed(2) + '/bbl';
-    el.style.color = crack > 25 ? 'var(--green)' : crack > 15 ? 'var(--accent)' : crack > 10 ? 'var(--muted)' : 'var(--red)';
+    // Color matches SCI logic: high crack = strong demand = tight supply = red
+    el.style.color = crack > 25 ? 'var(--red)' : crack > 15 ? 'var(--accent)' : crack > 10 ? 'var(--muted)' : 'var(--green)';
     const sig = document.getElementById('gs-crack-signal');
-    if (crack > 25) { sig.textContent = 'STRONG DEMAND'; sig.style.color = 'var(--green)'; }
+    if (crack > 25) { sig.textContent = 'STRONG DEMAND'; sig.style.color = 'var(--red)'; }
     else if (crack > 15) { sig.textContent = 'NORMAL DEMAND'; sig.style.color = 'var(--accent)'; }
     else if (crack > 10) { sig.textContent = 'SOFTENING'; sig.style.color = 'var(--muted)'; }
     else { sig.textContent = 'WEAK DEMAND'; sig.style.color = 'var(--red)'; }
@@ -1215,7 +1236,7 @@ function calculateSCI() {
   // WEIGHT PHILOSOPHY: Global fundamentals > Market structure > US data > Macro
   // Total possible weight: ~30 (global ~12, market ~8.5, US crude ~5.5, US products ~2, macro ~2)
   const components = [];
-  const maxSources = 17;
+  const maxSources = 19;
 
   // ── GLOBAL FUNDAMENTALS (highest weight ~12) ──
 
@@ -1225,15 +1246,36 @@ function calculateSCI() {
     // Positive = surplus, negative = deficit. Typical range: -2 to +3 mb/d
     components.push({ v: Math.max(-1, Math.min(1, balance / 2.5)), w: 4 });
   }
-  // 2. OPEC Production trend (weight 3 — the supply tap for Hormuz region)
+  // 2. OPEC Production trend (weight 2 — the supply tap for Hormuz region)
   if (steoData.opec.length >= 3) {
     const latest = parseFloat(steoData.opec[0].value);
     const threeAgo = parseFloat(steoData.opec[2].value);
     const change = latest - threeAgo; // 3-month trend in mb/d
     // Rising OPEC = more supply = surplus; falling = cuts = tight
-    components.push({ v: Math.max(-1, Math.min(1, change / 1.5)), w: 3 });
+    components.push({ v: Math.max(-1, Math.min(1, change / 1.5)), w: 2 });
   }
-  // 3. Non-OECD Demand growth (weight 2.5 — Asia/EM demand, where Hormuz oil goes)
+  // 3. OPEC Effective Spare Capacity (weight 3 — buffer against supply shocks)
+  // COPS_OPEC already excludes Iran/Venezuela/Libya (EIA sets them to 0)
+  if (steoData.spareCapacity !== null) {
+    const spare = steoData.spareCapacity;
+    // <1.5 mb/d = critical (-1), 2 = tight (-0.5), 3 = adequate (0), 5+ = comfortable (+1)
+    const s = Math.max(-1, Math.min(1, (spare - 3) / 2));
+    components.push({ v: s, w: 3 });
+  }
+  // 4. Deficit-to-Spare ratio (weight 2 — how much of the buffer is the deficit eating)
+  if (steoData.spareCapacity !== null && steoData.worldProd.length > 0 && steoData.worldCons.length > 0) {
+    const balance = parseFloat(steoData.worldProd[0].value) - parseFloat(steoData.worldCons[0].value);
+    const spare = steoData.spareCapacity;
+    if (spare > 0.1) { // avoid division by near-zero
+      const ratio = balance / spare; // negative ratio = deficit relative to buffer
+      // ratio -1 = deficit equals entire spare capacity (critical), 0 = balanced, +1 = surplus equals spare
+      components.push({ v: Math.max(-1, Math.min(1, ratio)), w: 2 });
+    } else {
+      // No spare capacity at all = maximum tight signal
+      components.push({ v: -1, w: 2 });
+    }
+  }
+  // 5. Non-OECD Demand growth (weight 2.5 — Asia/EM demand, where Hormuz oil goes)
   if (steoData.nonOecd.length >= 13) {
     const latest = parseFloat(steoData.nonOecd[0].value);
     const yearAgo = parseFloat(steoData.nonOecd[12].value);
@@ -1431,21 +1473,22 @@ window.addEventListener('load', async () => {
 const infoContent = {
   osi: {
     title: 'Supply Confidence Index (SCI)',
-    text: `<p>The SCI is a weighted composite of <span class="info-term">17 indicators</span> — global and US — that estimates the current oil supply balance. Score 0–100.</p>
+    text: `<p>The SCI is a weighted composite of <span class="info-term">19 indicators</span> — global and US — that estimates the current oil supply balance. Score 0–100.</p>
 <p><span class="info-term">0–30 = Tight</span> (red): scarcity, upward price pressure.<br>
 <span class="info-term">30–42 = Lean Tight</span><br>
 <span class="info-term">42–58 = Balanced</span>: equilibrium between supply and demand.<br>
 <span class="info-term">58–70 = Lean Surplus</span><br>
 <span class="info-term">70–100 = Surplus</span> (green): excess supply, downward price pressure.</p>
-<p><span class="info-term">Global fundamentals (~40%):</span><br>
-World S/D Balance (4) · OPEC Production Trend (3) · Non-OECD Demand YoY (2.5) · Brent Price (2.5)</p>
-<p><span class="info-term">Market structure (~28%):</span><br>
+<p><span class="info-term">Global fundamentals (~46%):</span><br>
+World S/D Balance (4) · Effective Spare Capacity (3) · OPEC Production Trend (2) · Deficit/Spare Ratio (2) · Non-OECD Demand YoY (2.5) · Brent Price (2.5)</p>
+<p><span class="info-term">Market structure (~25%):</span><br>
 Term Structure (3) · Crack Spread (2) · Price Momentum (1.5) · DXY (1.5) · Brent-WTI (0.5)</p>
-<p><span class="info-term">US crude data (~18%):</span><br>
+<p><span class="info-term">US crude data (~17%):</span><br>
 Inventory vs 5yr (1.5) · Cushing OK (1) · Inventory Trend (1) · US Production (1) · Net Imports (1)</p>
-<p><span class="info-term">US product inventories (~7%):</span><br>
+<p><span class="info-term">US product inventories (~6%):</span><br>
 Gasoline Stocks Trend (1) · Distillate Stocks Trend (1)</p>
 <p><span class="info-term">Macro (~3%):</span> VIX (1)</p>
+<p><span class="info-term">Spare Capacity</span> uses EIA STEO series COPS_OPEC, which already excludes Iran, Venezuela, and Libya (set to 0 by EIA). Saudi share shown via COPS_SA. The Deficit/Spare Ratio measures the world balance deficit relative to this effective buffer — a deficit equal to spare capacity scores as critical.</p>
 <p>Each component is normalized to −1 (tight) to +1 (surplus), multiplied by its weight, and averaged. Missing sources are excluded, not zeroed. Global data: EIA STEO (monthly). Market data: Yahoo Finance (~15 min delayed).</p>`
   },
   price: {
@@ -1476,6 +1519,7 @@ Gasoline Stocks Trend (1) · Distillate Stocks Trend (1)</p>
 <p><span class="info-term">Dollar Index (DXY)</span>: oil is traded in dollars. A strong dollar (DXY >104) makes oil more expensive for non-dollar countries → lower demand → bearish.</p>
 <p><span class="info-term">World Balance</span>: global production minus consumption (EIA STEO estimates). Positive = surplus oil on the market. Negative = deficit, upward price pressure.</p>
 <p><span class="info-term">OPEC Supply</span>: total OPEC petroleum production. Rising = more barrels flooding the market. OPEC controls ~30% of global output and can tighten/flood at will.</p>
+<p><span class="info-term">Spare Capacity</span>: OPEC effective spare capacity (EIA STEO, COPS_OPEC). This already excludes Iran, Venezuela, and Libya — the EIA sets their spare to 0. Shows Saudi share separately. Color: red &lt;2 mb/d (critical buffer), orange 2–3 mb/d (tight), green &gt;3 mb/d (adequate).</p>
 <p><span class="info-term">Non-OECD Demand</span>: liquid fuels consumption from non-OECD countries (China, India, SE Asia, Middle East). This is where marginal demand growth comes from. Rising = tighter market.</p>`
   },
   news: {
