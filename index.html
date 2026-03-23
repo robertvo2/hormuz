@@ -258,6 +258,7 @@
       <span class="ticker-item"><span class="sym">SPREAD</span><span id="t-spread">...</span></span>
       <span class="ticker-item"><span class="sym">DXY</span><span id="t-dxy">...</span></span>
       <span class="ticker-item"><span class="sym">CRACK</span><span id="t-crack">...</span></span>
+      <span class="ticker-item"><span class="sym">BZZ27</span><span id="t-cbz27">...</span></span>
       <span class="ticker-item"><span class="sym">BRENT</span><span id="t-brent2">...</span></span>
       <span class="ticker-item"><span class="sym">WTI</span><span id="t-wti2">...</span></span>
       <span class="ticker-item"><span class="sym">VIX</span><span id="t-vix2">...</span></span>
@@ -268,6 +269,7 @@
       <span class="ticker-item"><span class="sym">SPREAD</span><span id="t-spread2">...</span></span>
       <span class="ticker-item"><span class="sym">DXY</span><span id="t-dxy2">...</span></span>
       <span class="ticker-item"><span class="sym">CRACK</span><span id="t-crack2">...</span></span>
+      <span class="ticker-item"><span class="sym">BZZ27</span><span id="t-cbz27-2">...</span></span>
     </div>
   </div>
 </div>
@@ -540,6 +542,7 @@ async function loadPrices() {
     { sym: 'NG=F', id: 'ng' },
     { sym: '^GSPC', id: 'sp' },
     { sym: 'EURUSD=X', id: 'eur' },
+    { sym: 'BZZ27.NYM', id: 'cbz27' },
   ];
   for (const s of symbols) {
     const d = await fetchYahoo(s.sym);
@@ -618,6 +621,11 @@ function updatePriceTiles() {
   if (ng) ['t-ng','t-ng2'].forEach(id => document.getElementById(id).textContent = (ng.change>=0?'▲':'▼')+' $'+ng.price.toFixed(3));
   const sp = latestPrices.sp;
   if (sp) ['t-sp','t-sp2'].forEach(id => document.getElementById(id).textContent = (sp.change>=0?'▲':'▼')+' '+sp.price.toFixed(0));
+  const cbz27 = latestPrices.cbz27;
+  if (cbz27) ['t-cbz27','t-cbz27-2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = (cbz27.change>=0?'▲':'▼')+' $'+cbz27.price.toFixed(2); el.className = cbz27.change >= 0 ? 'up' : 'dn'; }
+  });
 }
 
 // ==========================================
