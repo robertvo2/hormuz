@@ -34,8 +34,7 @@
   .ticker-wrap { background: #080a0d; border-bottom: 1px solid var(--border); overflow: hidden; height: 22px; display: flex; align-items: center; flex-shrink: 0; }
   .ticker-label { background: var(--accent); color: #000; font-family: var(--mono); font-size: 10px; font-weight: bold; padding: 0 6px; height: 100%; display: flex; align-items: center; flex-shrink: 0; letter-spacing: 1px; }
   .ticker-inner { overflow: hidden; flex: 1; }
-  .ticker-scroll { display: flex; animation: scroll 8s linear infinite; white-space: nowrap; padding-left: 12px; }
-  @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  .ticker-scroll { display: flex; white-space: nowrap; padding-left: 12px; }
   .ticker-item { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); margin-right: 24px; }
   .ticker-item .sym { color: var(--accent); margin-right: 4px; }
   .up { color: #20c060; } .dn { color: #e03030; }
@@ -1474,7 +1473,27 @@ window.addEventListener('load', async () => {
   }
   refreshAll();
   setInterval(refreshAll, 3 * 60 * 1000);
+  initTicker();
 });
+
+function initTicker() {
+  const scroll = document.querySelector('.ticker-scroll');
+  if (!scroll) return;
+  const halfWidth = scroll.scrollWidth / 2;
+  let pos = 0;
+  let last = null;
+  const speed = 80; // pixels per second
+  function tick(ts) {
+    if (last !== null) {
+      pos += speed * (ts - last) / 1000;
+      if (pos >= halfWidth) pos -= halfWidth;
+      scroll.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
+    }
+    last = ts;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
 // ==========================================
 // INFO POPUP SYSTEM
 // ==========================================
