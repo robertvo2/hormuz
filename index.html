@@ -1479,13 +1479,13 @@ window.addEventListener('load', async () => {
 function initTicker() {
   const scroll = document.querySelector('.ticker-scroll');
   if (!scroll) return;
-  const halfWidth = scroll.scrollWidth / 2;
   let pos = 0;
   let last = null;
   const speed = 40; // pixels per second
   function tick(ts) {
     if (last !== null) {
       pos += speed * (ts - last) / 1000;
+      const halfWidth = scroll.scrollWidth / 2;
       if (pos >= halfWidth) pos -= halfWidth;
       scroll.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
     }
