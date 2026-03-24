@@ -1482,7 +1482,7 @@ function initTicker() {
   const halfWidth = scroll.scrollWidth / 2;
   let pos = 0;
   let last = null;
-  const speed = 80; // pixels per second
+  const speed = 40; // pixels per second
   function tick(ts) {
     if (last !== null) {
       pos += speed * (ts - last) / 1000;
