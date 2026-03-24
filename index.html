@@ -1458,6 +1458,7 @@ async function refreshAll() {
   setLastUpdated();
   const hasErrors = Object.values(apiStatus).some(v => v === 'err');
   dot.className = hasErrors ? 'status-dot error' : 'status-dot';
+  refreshTickerWidth();
 }
 
 // ==========================================
@@ -1476,17 +1477,23 @@ window.addEventListener('load', async () => {
   initTicker();
 });
 
+let tickerHalfWidth = 0;
+function refreshTickerWidth() {
+  const scroll = document.querySelector('.ticker-scroll');
+  if (scroll) tickerHalfWidth = scroll.scrollWidth / 2;
+}
+
 function initTicker() {
   const scroll = document.querySelector('.ticker-scroll');
   if (!scroll) return;
+  refreshTickerWidth();
   let pos = 0;
   let last = null;
   const speed = 40; // pixels per second
   function tick(ts) {
-    if (last !== null) {
+    if (last !== null && tickerHalfWidth > 0) {
       pos += speed * (ts - last) / 1000;
-      const halfWidth = scroll.scrollWidth / 2;
-      if (pos >= halfWidth) pos -= halfWidth;
+      if (pos >= tickerHalfWidth) pos -= tickerHalfWidth;
       scroll.style.transform = 'translateX(-' + pos.toFixed(2) + 'px)';
     }
     last = ts;
