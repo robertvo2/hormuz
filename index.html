@@ -1571,26 +1571,51 @@ Chart.defaults.font.size = 9;
 let charts = {};
 
 // ==========================================
-// DATA FETCH HELPERS
+// DATA FETCH HELPERS — fast proxy racing with per-attempt timeout
 // ==========================================
+// Yahoo CORS-blocks browsers, so direct is always waste. Skip it.
+// Race 3 proxies in parallel — first success wins. Remember winner for
+// subsequent calls this session so retries stay fast.
+const YAHOO_PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+const PROXY_TIMEOUT_MS = 5000;
+let bestProxyIdx = parseInt(sessionStorage.getItem('hormuz_proxy_idx') || '-1');
+
+function fetchWithTimeout(url, ms) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  return fetch(url, { signal: ctl.signal }).finally(() => clearTimeout(t));
+}
+
+async function raceProxies(rawUrl) {
+  // If we already know a good proxy, try it first with short timeout.
+  if (bestProxyIdx >= 0) {
+    try {
+      const r = await fetchWithTimeout(YAHOO_PROXIES[bestProxyIdx](rawUrl), PROXY_TIMEOUT_MS);
+      if (r.ok) return r;
+    } catch(e) {}
+  }
+  // Race all proxies in parallel; first ok response wins.
+  const attempts = YAHOO_PROXIES.map((p, idx) => new Promise(async (resolve, reject) => {
+    try {
+      const r = await fetchWithTimeout(p(rawUrl), PROXY_TIMEOUT_MS);
+      if (!r.ok) return reject(new Error('status ' + r.status));
+      bestProxyIdx = idx;
+      sessionStorage.setItem('hormuz_proxy_idx', String(idx));
+      resolve(r);
+    } catch(e) { reject(e); }
+  }));
+  try { return await Promise.any(attempts); } catch(e) { return null; }
+}
+
 async function fetchYahoo(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`;
-  try {
-    const r = await fetch(url);
-    if (r.ok) return parseYahooResponse(await r.json());
-  } catch(e) {}
-  try {
-    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const r = await fetch(proxy);
-    const j = await r.json();
-    return parseYahooResponse(JSON.parse(j.contents));
-  } catch(e) {}
-  try {
-    const proxy2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-    const r = await fetch(proxy2);
-    return parseYahooResponse(await r.json());
-  } catch(e) {}
-  return null;
+  const r = await raceProxies(url);
+  if (!r) return null;
+  try { return parseYahooResponse(await r.json()); } catch(e) { return null; }
 }
 
 function parseYahooResponse(data) {
@@ -1604,25 +1629,18 @@ function parseYahooResponse(data) {
 
 async function fetchYahooHistory(symbol, range, interval) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
-  for (const fetcher of [
-    () => fetch(url),
-    () => fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`).then(r => r.json()).then(j => ({ ok: true, json: () => Promise.resolve(JSON.parse(j.contents)) })),
-    () => fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`),
-  ]) {
-    try {
-      const r = await fetcher();
-      if (!r.ok) continue;
-      const data = await r.json();
-      const result = data.chart.result[0];
-      const ts = result.timestamp;
-      const quotes = result.indicators.quote[0];
-      return ts.map((t, i) => ({
-        date: new Date(t * 1000).toISOString(),
-        close: quotes.close[i],
-      })).filter(d => d.close !== null);
-    } catch(e) { continue; }
-  }
-  return null;
+  const r = await raceProxies(url);
+  if (!r) return null;
+  try {
+    const data = await r.json();
+    const result = data.chart.result[0];
+    const ts = result.timestamp;
+    const quotes = result.indicators.quote[0];
+    return ts.map((t, i) => ({
+      date: new Date(t * 1000).toISOString(),
+      close: quotes.close[i],
+    })).filter(d => d.close !== null);
+  } catch(e) { return null; }
 }
 
 // ⚠️ API KEY EXPOSURE WARNING: This key is visible in client-side code.
@@ -1631,17 +1649,15 @@ const EIA_KEY = _k.join('');
 async function fetchEia(route, params = {}) {
   const qp = new URLSearchParams({ api_key: EIA_KEY, ...params });
   const url = `https://api.eia.gov/v2/${route}?${qp}`;
+  // EIA supports CORS directly — try that first with timeout
   try {
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url, PROXY_TIMEOUT_MS);
     if (r.ok) return await r.json();
   } catch(e) {}
-  try {
-    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const r = await fetch(proxy);
-    const j = await r.json();
-    return JSON.parse(j.contents);
-  } catch(e) {}
-  return null;
+  // Fallback via proxy race
+  const r = await raceProxies(url);
+  if (!r) return null;
+  try { return await r.json(); } catch(e) { return null; }
 }
 
 // ==========================================
@@ -1661,13 +1677,11 @@ async function loadPrices() {
     { sym: '^GSPC', id: 'sp' },
     { sym: 'EURUSD=X', id: 'eur' },
   ];
-  for (const s of symbols) {
+  // Parallel + progressive render — each ticker paints as soon as its data lands
+  await Promise.all(symbols.map(async s => {
     const d = await fetchYahoo(s.sym);
-    if (!d) continue;
-    latestPrices[s.id] = d;
-    await new Promise(r => setTimeout(r, 300));
-  }
-  updatePriceTiles();
+    if (d) { latestPrices[s.id] = d; updatePriceTiles(); }
+  }));
 }
 
 function fmtChg(change, pct) {
@@ -2148,25 +2162,28 @@ async function loadNews() {
     { url: 'https://news.google.com/rss/search?q=oil+crude+hormuz+strait&hl=en-US&gl=US&ceid=US:en', name: 'Google' },
   ];
   async function fetchRSS(feedUrl) {
-    try {
-      const r = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&count=8`);
-      if (r.ok) { const d = await r.json(); if (d.items && d.items.length > 0) return d.items; }
-    } catch(e) {}
-    try {
-      const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`);
-      if (r.ok) {
-        const xml = await r.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(xml, 'text/xml');
-        const items = [...doc.querySelectorAll('item')].slice(0, 8).map(item => ({
-          title: item.querySelector('title')?.textContent || '',
-          link: item.querySelector('link')?.textContent || '',
-          pubDate: item.querySelector('pubDate')?.textContent || '',
-        }));
-        if (items.length > 0) return items;
-      }
-    } catch(e) {}
-    return [];
+    // Race rss2json + allorigins raw XML in parallel; first success wins
+    const rss2json = (async () => {
+      const r = await fetchWithTimeout(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&count=8`, PROXY_TIMEOUT_MS);
+      if (!r.ok) throw new Error('rss2json ' + r.status);
+      const d = await r.json();
+      if (!d.items || d.items.length === 0) throw new Error('rss2json empty');
+      return d.items;
+    })();
+    const allorigins = (async () => {
+      const r = await fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`, PROXY_TIMEOUT_MS);
+      if (!r.ok) throw new Error('allorigins ' + r.status);
+      const xml = await r.text();
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const items = [...doc.querySelectorAll('item')].slice(0, 8).map(item => ({
+        title: item.querySelector('title')?.textContent || '',
+        link: item.querySelector('link')?.textContent || '',
+        pubDate: item.querySelector('pubDate')?.textContent || '',
+      }));
+      if (items.length === 0) throw new Error('allorigins empty');
+      return items;
+    })();
+    try { return await Promise.any([rss2json, allorigins]); } catch(e) { return []; }
   }
   let allItems = [];
   const results = await Promise.allSettled(feeds.map(async feed => {
