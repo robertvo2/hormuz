@@ -1370,6 +1370,7 @@
     <div class="ticker-scroll">
       <span class="ticker-item"><span class="sym">BRENT</span><span id="t-brent">...</span></span>
       <span class="ticker-item"><span class="sym">BRENT '27</span><span id="t-bz27">...</span></span>
+      <span class="ticker-item"><span class="sym">BRENT '29</span><span id="t-bz29">...</span></span>
       <span class="ticker-item"><span class="sym">WTI</span><span id="t-wti">...</span></span>
       <span class="ticker-item"><span class="sym">VIX</span><span id="t-vix">...</span></span>
       <span class="ticker-item"><span class="sym">EUR/USD</span><span id="t-eur">...</span></span>
@@ -1381,6 +1382,7 @@
       <span class="ticker-item"><span class="sym">CRACK</span><span id="t-crack">...</span></span>
       <span class="ticker-item"><span class="sym">BRENT</span><span id="t-brent2">...</span></span>
       <span class="ticker-item"><span class="sym">BRENT '27</span><span id="t-bz272">...</span></span>
+      <span class="ticker-item"><span class="sym">BRENT '29</span><span id="t-bz292">...</span></span>
       <span class="ticker-item"><span class="sym">WTI</span><span id="t-wti2">...</span></span>
       <span class="ticker-item"><span class="sym">VIX</span><span id="t-vix2">...</span></span>
       <span class="ticker-item"><span class="sym">EUR/USD</span><span id="t-eur2">...</span></span>
@@ -1670,6 +1672,7 @@ async function loadPrices() {
   const symbols = [
     { sym: 'BZ=F', id: 'brent' },
     { sym: 'BZZ27.NYM', id: 'bz27' },
+    { sym: 'BZZ29.NYM', id: 'bz29' },
     { sym: 'CL=F', id: 'wti' },
     { sym: '^VIX', id: 'vix' },
     { sym: 'GC=F', id: 'gold' },
@@ -1753,6 +1756,12 @@ function updatePriceTiles() {
     const e = document.getElementById(id);
     e.textContent = (bz27.change>=0?'▲':'▼')+' $'+bz27.price.toFixed(2);
     e.className = bz27.change >= 0 ? 'up' : 'dn';
+  });
+  const bz29 = latestPrices.bz29;
+  if (bz29) ['t-bz29','t-bz292'].forEach(id => {
+    const e = document.getElementById(id);
+    e.textContent = (bz29.change>=0?'▲':'▼')+' $'+bz29.price.toFixed(2);
+    e.className = bz29.change >= 0 ? 'up' : 'dn';
   });
   const ng = latestPrices.ng;
   if (ng) ['t-ng','t-ng2'].forEach(id => document.getElementById(id).textContent = (ng.change>=0?'▲':'▼')+' $'+ng.price.toFixed(3));
